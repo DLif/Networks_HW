@@ -71,13 +71,17 @@ void server_loop(int listeningSoc){
 
 		select(fd_max+1,&read_set,&write_set,NULL,NULL);
 
-		//check new connection requests
-		max_client_num = get_new_connections(runnigSoc,max_client_num);
-		if (max_client_num == NETWORK_FUNC_FAILURE)
+		//check if there is a new requests to connect - and add it
+		if (FD_ISSET(listeningSoc,&read_set))
 		{
-			//print error
-			break;
+			max_client_num = get_new_connections(runnigSoc,max_client_num,listeningSoc,&);
+			if (max_client_num == NETWORK_FUNC_FAILURE)
+			{
+				//print error
+				break;
+			}
 		}
+
 		//get all client input and handle it
 		game_stat =handle_reading_writing(&read_set,&write_set,runnigSoc,max_client_num);
 		if (game_stat == NETWORK_FUNC_FAILURE)
@@ -98,8 +102,38 @@ void server_loop(int listeningSoc){
 }
 
 //this function accept new connections and add them to the list(if any)
-int get_new_connections(int runnigSoc[],int max_client_num){
-	return NETWORK_FUNC_FAILURE;
+//return the new maximum of numbers of clients
+int get_new_connections(int runnigSoc[],int max_client_num,int listeningSoc){
+	//in this variable we save the client's address information
+	struct sockaddr_in clientAdderInfo;
+	socklen_t addressSize = sizeof(clientAdderInfo);
+	//clients socket
+	int toClientSocket = -1;
+
+	//QUSTION-what will happen if 2 clients connected at once? accept twice ? how to we know?
+
+	//accept the connection from the client
+	toClientSocket = accept(listeningSoc,(struct sockaddr*) &clientAdderInfo,&addressSize);
+	if(toClientSocket < 0)
+	{
+		printf("Error: failed to accept connection: %s\n", strerror(errno));
+		close_socket(listeningSoc);
+		return NETWORK_FUNC_FAILURE;
+	}
+
+	if (max_client_num >= AWATING_CLIENTS_NUM)
+	{
+		//send reject message
+		//close toClientSocket
+	}
+	else{
+		//add new connection to runnigSoc and append max_client_num
+		runnigSoc[max_client_num] = toClientSocket;
+		max_client_num++;
+	}
+
+	//in case max_client_num >= AWATING_CLIENTS_NUM max_client_num will be uncahnged
+	return max_client_num;
 }
 
 //handle all input and output to clients (all the game actually)
