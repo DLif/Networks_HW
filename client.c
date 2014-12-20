@@ -13,6 +13,9 @@
 #include <limits.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <sys/time.h>
+#include <unistd.h>
+#include <sys/ioctl.h>
 
 
 #include "nim_protocol_tools.h"
@@ -31,15 +34,19 @@
 #define CONNECT_ERR       "Error: Failed to connect to server"
 #define USER_INPUT_ERR    "Error: invalid arguments given by user\n"
 #define SEND_ERR          "Error: Failed to send data to server"
-#define RECV_ERR          "Error: Failed to recieve data from server"
+#define RECV_ERR          "Error: Failed to receive data from server"
+#define INVALID_MSG_ERR   "Error: invalid message received from the server, exiting ... \n"
+#define SELECT_ERR        "Error: select failed, "
 
 
-static int sockfd; /* socket to connect to the server, global (private) variable */
+static int sockfd;         /* socket to connect to the server, global (private) variable */
+static int client_type;    /* holds SPECTATOR or PLAYER */
+static int client_turn;    /* 1 iff it is currently this clients turn */
 
 int main(int argc, char* argv[])
 {
 
-	char* host_name =   DEFAULT_HOST;
+	char* host_name   = DEFAULT_HOST;
 	char* server_port = DEFAULT_PORT;
 	
 	// process command line parameters
@@ -47,15 +54,18 @@ int main(int argc, char* argv[])
 	
 	// establish connection to server (sets global sockfd) 
 	connect_to_server(host_name, server_port);
-	
-	// run the game protocol
+
+	// read and handle openning message from server
+	read_openning_message();
+
+	// connection was accepted, and client was accepted, run the game protocol
 	play_nim();
 
 }
 
 /* 
 	method reads arguments given in command line and parses them
-	*host_name, *server_port will be modified is non default value was given.
+	*host_name, *server_port will be modified i non default value was given.
 	on invalid input: error message will be printed and program will be terminated.
 */
 
@@ -172,6 +182,37 @@ void read_server_message(char* buffer, int num_bytes)
 }
 
 /* 
+	this method sends a message to the server (reads num_bytes into buffer)
+	if connection was closed by the other side, a proper message will be printed (print_closed_connection())
+	if any other error occured, a proper message will be printed
+	in anycase, the global socket descriptor will be closed and program terminated 
+*/
+
+void send_message(char* buffer, int num_bytes)
+{
+
+	int closed_connection = 0;
+	if(send_all(sockfd, buffer, num_bytes, &closed_connection))
+	{
+		// error 
+		if(closed_connection)
+		{
+			/* other end was closed */
+			print_closed_connection();
+		}
+		else
+		{
+			printf("%s: %s\n", SEND_ERR, &closed_connection);
+		}
+
+		quit();
+	
+
+	}
+}
+
+
+/* 
    protocol implementation part 
    this method communicates with the server to play nim
    sockfd should hold a valid socket descriptor to communicate with the server
@@ -180,69 +221,55 @@ void read_server_message(char* buffer, int num_bytes)
 
 void play_nim()
 {
-	/* first byte of protocol */
-	char game_type;
-
-	/* print nim title */
-	print_title();
-
-	/* read the openning message, isMisere, one byte*/
-	read_server_message(&game_type, sizeof(char));
 	
-	/* print the game type message to the console */
-	print_game_type(game_type);
-
-	
-	/* first byte of each message recieved from the server (except the first unique message that only describes game type)
-		 contains game status flags as described in the protocol
-	 */
-	unsigned char game_status;	 
-	int first = 1;	/* simple flag to indiciate whether it is the first time we're printing the heaps */
-
-	do
+	/* main client loop */
+	for(;;)
 	{
-		if(first)
+		// construct fd_set for reading from sockets
+		fd_set read_set;
+		FD_ZERO(&read_set);
+
+		// add stdin, sockfd
+		FD_SET(sockfd, &read_set);
+		FD_SET(STDIN_FILENO, &read_set);
+
+		int num_ready;
+
+		if((num_ready = select( sockfd + 1, &read_set, NULL, NULL, NULL)) < 0)
 		{
-			first = 0;
-		}
-		else
-		{
-			// also print if last message was accepted or not
-			print_message_acked(game_status);
+			printf("%s %s", SELECT_ERR, strerror(errno));
+			quit();
 		}
 
-		// get heaps' sizes from the server, and print them to the user
-		get_heap_sizes();
+
+		// handle server message
+		if(FD_ISSET(sockfd, &read_set))
+		{
+			handle_server_message();
+		}
+
+		// handle user input
+		if(FD_ISSET(STDIN_FILENO, &read_set))
+		{
+			handle_user_input();
+		}
+
 		
-		// read user input and act accordingly (send query if input is not Q)
-		handle_user_move();
 
-		// recieve status byte from server (one byte)
-		read_server_message((char*)(&game_status), sizeof(char));
-
-	} while(!hasGameEnded(game_status));
-
-	/* if we have reached this part, game has ended, print the last messages */
-	print_message_acked(game_status);
-	get_heap_sizes();
-	print_winner(game_status);
-	return;
+	}
+	
 	
 }
 
-
-
 /*
-	this method reads heap number (starts from 0, meaning left most) and number of items to remove from heap
-	method then sends this request (following the protocol) to the server
-	if any error occures (sending error, input error) a proper message is printed and method is terminated
+	this method handles user input, figures what the user wants to do (send message or make a move)
+	and handles the errors along the way 
 */
 
-void handle_user_move()
+void handle_user_input()
 {
-	char req; /* A, B, C, D or Q */
 
-	print_turn_message();
+	char req; /* A, B, C, D, Q or M */
 
 	if(scanf("%1s", &req) != 1)
 	{
@@ -252,20 +279,230 @@ void handle_user_move()
 	
 	if(req == 'Q')
 	{
+		/* quit the program */
 		quit();
 	}
-	// calculate heap number to update (0 index is the left most)
-	unsigned char heap_num = 0;
-	if(req == 'A' || req == 'B' || req == 'C' || req == 'D')
+
+	if(req >= 'A' && req <= 'D')
 	{
-		heap_num = (unsigned char)(req - 'A');
+		/* user wants to make a move, read the rest of the message */
+		handle_user_move(req);
+		return;
 	}
-	else
+	
+	/* other option: MSG */
+
+	if(req != 'M')
 	{
-		// error, invalid input
 		printf(USER_INPUT_ERR);
 		quit();
 	}
+
+	char buffer[10];
+	if(scanf("%2s", &buffer) != 2)
+	{
+		printf(USER_INPUT_ERR);
+		quit();
+	}
+
+	/* close string */
+	buffer[2] = 0;
+
+	if(strcmp(buffer, "SG"))
+	{
+		// invalid input
+		printf(USER_INPUT_ERR);
+		quit();
+	}
+
+	char destination_id;
+	long temp; 
+
+	if(scanf("%ld", &temp) != 1)
+	{
+		printf(USER_INPUT_ERR);
+		quit();
+	}
+
+	// determine if the number can be cast to unsigned char properly
+	if(temp == LONG_MIN || temp == LONG_MAX || temp == 0 || temp > UCHAR_MAX || temp < -1)
+	{
+		/* note that we allow temp == -1 */
+		printf(USER_INPUT_ERR);
+		quit();
+	}
+	
+	// check if broadcast
+	if( temp == -1)
+	{
+		destination_id = -1;
+	}
+	else
+		destination_id = (char)temp;
+
+	/* read the actual message */
+	char buffer_msg[MAX_MSG_SIZE];
+	int c ; 
+	int count = 1;
+	int success = 0;
+	while((c = getchar()) != -1 && count < MAX_MSG_SIZE)
+	{
+		if(c != '\n')
+			buffer_msg[count-1] = c;
+		else
+		{
+			success = 1;
+			break;
+		}
+	}
+
+	if(!success)
+	{
+		if( c == -1)
+		{
+			// EOF or error
+			printf("Error: error occured while reading input from user\n");
+
+		}
+		else 
+			// no error occured, but we run out of buffer space without seeing '\n'
+			printf("Error: entered message exceeds maximum message length, which is 255 chars\n");
+		quit();
+	}
+	
+	/* finally, send the message */
+	client_to_client_message message;
+	create_client_to_client_message(&message, client_id, destination_id, (char)count);
+
+	send_message(&message, sizeof(message));  /* send header  */
+	send_message(buffer_msg, count);          /* send content */
+	
+
+}
+
+
+
+/*
+	this method handles receives a message from the server, classifiying and handling it
+*/
+void handle_server_message()
+{
+	
+	message_container message;
+	int connection_closed;
+	int err_code = read_message(sockfd, &message, &connection_closed)
+	if(err_code != SUCCESS)
+	{
+		handle_receive_error(err_code, connection_closed);
+	}
+
+	/* otherwise, read message from server successfully */
+	switch(message.message_type)
+	{
+	case HEAP_UPDATE_MSG:
+		handle_heaps_update((*heap_update_message)(&message));
+		break;
+	case CLIENT_TURN_MSG:
+		print_turn_message();
+		client_turn  = 1;  /* currently it is clients turn */
+		break;
+	case ACK_MOVE_MSG:
+	case ILLEGAL_MOVE_MSG:
+		print_message_acked(message.message_type);
+		break;
+	case MSG:
+		handle_player_message((*player_to_player_message)(&message));
+		break;
+	case PROMOTION_MSG:
+		client_type = PLAYER; /* client is not playing */
+		print_promotion();
+		break;
+	default:
+		/* cant reach this part*/
+		break;
+	}
+}
+
+
+
+/* 
+	this method handles a message that was sent from another client 
+
+*/
+void handle_player_message(client_to_client_message* msg)
+{
+	char msg_buffer[MAX_MSG_SIZE + 1];
+	unsigned message_size = (unsigned)(msg->length);
+	// close string
+	msg_buffer[message_size] = 0;
+
+	// receive the actual message
+	read_server_message(msg_buffer, message_size);
+
+	// print the message to the client
+	printf("%u: %s", msg->sender_id, msg_buffer);
+
+}
+
+
+
+
+
+/*
+	This method handles a heap update message from the server
+	also handles if game has ended, and receives winning status if not spectator 
+*/
+
+void handle_heaps_update(heap_update_message* msg)
+{
+	/* print the heaps */
+	print_heaps(msg->heaps);
+
+	if(msg->game_over == GAME_CONTINUES)
+		return;
+
+	if(msg->game_over != GAME_OVER)
+	{
+		// bogus message
+		handle_receive_error(INVALID_MESSAGE_HEADER, 0);
+	}
+
+	if(client_type == SPECTATOR)
+	{
+		print_game_over();
+		return;
+	}
+
+	/* else, read another byte from the server, that holds whether we won or lost */
+	char winning_status;
+	read_server_message(&winning_status, 1);
+
+	if(winning_status != WIN && winning_status != LOSE)
+	{
+		// bogus message
+		handle_receive_error(INVALID_MESSAGE_HEADER, 0);
+	}
+
+	print_game_over(winning_status);
+	quit();
+	
+}
+
+
+
+
+/*
+	this method reads the number of items to remove from heap, then sends a request to the server to make a move
+	remove those items from given heap.
+	if client is a spectator, an error message will be printed and the game will continue
+	if any (other) error occures (sending error, input error) a proper message is printed and method is terminated
+*/
+
+void handle_user_move(char heap)
+{
+
+	// calculate heap number to update (0 index is the left most)
+	char heap_num  = req - 'A';
 	
 	// read number of items to remove
 	unsigned short items_to_remove;
@@ -286,30 +523,22 @@ void handle_user_move()
 	items_to_remove = (unsigned short)temp;
 		
 
-	// build request for server: heap number (byte), next one short: items_to_remove (network byte order)
-	char client_query[CLIENT_QUERY_SIZE];
-	client_query[0] = heap_num;
-	unsigned short* p = (unsigned short*)(client_query + 1);
-	p[0] = htons(items_to_remove);
-
-	int connection_closed;
-
-	// send the query
-	if(send_all(sockfd, client_query, CLIENT_QUERY_SIZE, &connection_closed))
+	if(!client_turn)
 	{
-		// error
-		if(connection_closed)
-		{
-			/* other end was closed. */
-			print_closed_connection();
-		}
-		else {
-			printf("%s: %s\n", SEND_ERR, strerror(errno));
-		}
-		quit();
-		
+		// not clients turn!
+		printf("Move rejected: this is not your turn\n");
+		return;
+
 	}
-	return;
+	// build request for server and send it
+	player_move_msg msg; 
+
+	create_player_move_message(&msg, heap_num, items_to_remove);
+
+	send_message(&msg, sizeof(msg));
+
+	client_turn = 0; /* the turn passed */
+
 
 }
 
@@ -318,4 +547,67 @@ void quit()
 {
 	close_socket(sockfd);
 	exit(0);
+}
+
+
+void read_openning_message()
+{
+	int connection_closed = 0 ;
+	openning_message msg;
+	int ret;
+
+	ret = read_openning_message(sockfd, &msg, &connection_closed);
+	
+	if(ret != SUCCESS)
+	{
+		handle_receive_error(ret, connection_closed);
+	}
+
+	// else, ret == SUCCESS
+	if(msg->connection_accepted == CONNECTION_DENIED)
+	{
+		print_connection_refused();
+		quit();
+	}
+
+	// otherwise, connection accepted, process the message
+
+	// check if message is valid
+	if(valiadte_opening_message(msg))
+	{
+		handle_receive_error(INVALID_MESSAGE_HEADER, 0);
+	}
+	// get and set client type
+	client_type = msg.client_type;
+
+	// print the openning message
+	proccess_openning_message(msg);
+
+}
+
+
+void handle_receive_error(int return_code, int connection_closed)
+{
+
+
+	if(return_code == INVALID_MESSAGE_HEADER)
+	{
+		// not a connection error, but rather the server sent garbage message
+		// consider the connection closed
+		printf(INVALID_MSG_ERR);
+	}
+
+	else if(connection_closed)
+	{
+		/* other end was closed */
+		print_closed_connection();
+	}
+	else
+	{
+		/* some other recv error, use errno */
+		printf("%s: %s\n", RECV_ERROR, strerror(errno));
+	}
+
+	quit();
+
 }

@@ -12,7 +12,7 @@
 
 
 /* this method prints the type of game line. game is  regular iff isMisere == 0, otherwise positive */
-void print_game_type(unsigned char isMisere)
+void print_game_type(char isMisere)
 {
 	printf("%s\n", isMisere ? MISERE_GAME_MSG : REGULAR_GAME_MSG);
 	
@@ -28,7 +28,7 @@ void print_title(void)
 /* various game messages to print according to game_status byte (as defined in the protocol) */
 #define SERVER_WON_STR "I win!\n"
 #define CLIENT_WON_STR "You win!\n"
-void print_winner(unsigned char game_status)
+void print_winner( char game_status)
 {
 	if(hasServerWon(game_status) == 1)
 	{
@@ -40,9 +40,9 @@ void print_winner(unsigned char game_status)
 
 #define MESSAGE_ACKED_STR "Move accepted\n"
 #define MESSAGE_DECLINED_STR "Illegal move\n"
-void print_message_acked(unsigned char game_status)
+void print_message_acked( int acked )
 {
-	if(lastMessageAcked(game_status))
+	if(acked == ACK_MOVE_MSG)
 	{
 		printf(MESSAGE_ACKED_STR);
 	}
@@ -71,3 +71,102 @@ void print_closed_connection()
 {
 	printf(DISCONNECTED_STR);
 }
+
+#define CONNECTION_REFUSED "Client rejected: too many clients are already connected\n"
+void print_connection_refused()
+{
+	printf(CONNECTION_REFUSED);
+}
+
+#define NUMBER_OF_PLAYERS  "Number of players is "
+void print_num_players(char p)
+{
+	printf("%s%u", NUMBER_OF_PLAYERS, p);
+}
+
+#define CLIENT_ID "You are client "
+void print_client_id(char id)
+{
+	printf("%s%u", CLIENT_ID, id);
+}
+
+
+#define CLIENT_SPECTATOR_MSG "You are only viewing"
+#define CLIENT_PLAYER_MSG    "You are playing"
+
+void print_client_type(char client_type)
+{
+	if(client_type == PLAYER)
+		printf(CLIENT_PLAYER_MSG);
+	else
+		printf(CLIENT_SPECTATOR_MSG);
+}
+
+#define GAME_OVER_MSG "Game over!"
+
+void print_game_over()
+{
+	printf(GAME_OVER_MSG);
+}
+
+#define CLIENT_WON_STR "You win!"
+#define CLIENT_LOST_STR "You lose!"
+
+void print_game_over(int win_status)
+{
+	if(winner == WIN)
+		printf(CLIENT_WON_STR);
+	else
+		printf(CLIENT_LOST_STR);
+}
+
+
+#define PROMOTION_STR "You are now playing!\n"
+void print_promotion()
+{
+	printf(PROMOTION_STR);
+}
+
+
+/*
+	this method prints the openning message to the client
+*/
+
+void proccess_openning_message(openning_message* msg)
+{
+	print_title();
+	print_game_type(msg->isMisere);
+	print_num_players(msg->p);
+	print_client_id(msg->client_id);
+	print_client_type(msg->client_type);
+
+}
+
+
+/*
+
+	This method checks whether the openning message recieved from the server is legal
+	i.e. contains values defined in the protocol 
+
+	returns positive value on error, otherwise returns 0
+*/
+
+
+int valiadate_openning_message(openning_message* msg)
+{
+	/* check isMisere field */
+	if(msg->isMisere != MISERE && msg->isMisere != REGULAR)
+	{
+		return 1;
+	}
+
+	/* check client type */
+	if(msg->client_type != PLAYER && msg->client_type != SPECTATOR)
+	{
+		return 1;
+	}
+
+	return 0;
+}
+
+
