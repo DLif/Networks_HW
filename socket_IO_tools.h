@@ -1,5 +1,6 @@
 /* this unit provides useful methods for handling socket IO */
-
+#ifndef SOCKET_IO_H
+#define SOCKET_IO_H
 #define SERVER_MESSAGE_SIZE 9
 
 /* 
@@ -58,3 +59,4 @@ int recv_partially(int sockfd, char* buffer, int num_bytes, int* connection_clos
 void close_socket(int sockfd);
 
 
+#endif

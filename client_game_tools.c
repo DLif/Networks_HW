@@ -25,18 +25,7 @@ void print_title(void)
 	printf("%s\n", GAME_TITLE);
 }
 
-/* various game messages to print according to game_status byte (as defined in the protocol) */
-#define SERVER_WON_STR "I win!\n"
-#define CLIENT_WON_STR "You win!\n"
-void print_winner( char game_status)
-{
-	if(hasServerWon(game_status) == 1)
-	{
-		printf(SERVER_WON_STR);
-	}
-	else
-		printf(CLIENT_WON_STR);
-}
+
 
 #define MESSAGE_ACKED_STR "Move accepted\n"
 #define MESSAGE_DECLINED_STR "Illegal move\n"

@@ -1,3 +1,5 @@
+#ifndef IO_BUFFER_H
+#define IO_BUFFER_H
 #include "IO_buffer.h"
 
 /* 
@@ -35,3 +37,4 @@ void free_buff_socket(buffered_socket* sock);
 
 
 
+#endif

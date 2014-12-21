@@ -189,7 +189,19 @@ int get_message_size(int message_type);
 /*
   method that reads the openning message from the server, used in the client only 
 */
-int read_openning_message(int sockfd, openning_message* msg, int* connection_closed )
+int read_openning_message(int sockfd, openning_message* msg, int* connection_closed );
+
+
+/*
+	this method returns 0 if the given message is structually (i.e, each fields receives proper values ) valid 
+	otherwise returns 1
+
+	NOTE: 
+		in case of player to player message the server still needs to check that
+		the ids in the struct are valid, since only the server knows what values are valid
+*/
+
+int valiadate_message(message_container* msg);
 
 
 /* constants for the return values of read_message and read_openning_message */
