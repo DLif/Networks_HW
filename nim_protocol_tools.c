@@ -166,67 +166,6 @@ int get_message_size(int message_type)
 
 
 
-/*
-
-	This method reads a protocol message from server or from the client [ all messages except the openning message received by the client ]
-	parameters:
-
-		- sockfd - the socket from which to read the message
-		- container - a pointer to a message_container struct (a struct that is big enough to hold any message)
-		- connection_closed - will point to a positive value if the connection closed during the reading
-		                      0 otherwise
-
-	note that this method will not read sizeof(container) bytes but rather the actual size of the message
-	as defined by its message type (the first byte that is read from the socket )
-
-
-	return values:
-		- if connection failed, failed to read from the socket, or connection was closed
-		  the method will return CONNECTION_ERROR and in case that the connection was closed *connection_closed 
-		  will also point to a positive value ( 0 otherwise)
-	    - if the message recieved could not be identifed (invalid message type), returns INVALID_MESSAGE_HEADER
-		- if the method succeed, SUCCESS is returned
-*/
-
-
-int read_message(int sockfd, message_container* container, int* connection_closed)
-{
-	
-	/* read the first byte first, that defines the type of the message */
- 
-	if(recv_all(sockfd, (char*)container, 1, connection_closed))
-	{
-		/* error occured */
-		return CONNECTION_ERROR;
-	}
-
-	char* message_content = ((char*)container) + 1 ;               /* skip the first byte, type of message */
-	int message_size = get_message_size(container->message_type);  /* get the size of the actual struct    */
-
-	if(message_size < 0)
-	{
-		/* invalid message type read from server */
-		return INVALID_MESSAGE_HEADER;
-	}
-
-	if(message_size == 1)
-	{
-		/* we only needed to read a single byte, that defines the message */
-		return SUCCESS;
-	}
-
-	/* read the rest of the message */
-	if(recv_all(sockfd, message_content, message_size - 1, connection_closed))
-	{
-		/* error occured */
-		return CONNECTION_ERROR;
-	}
-
-	/* otherwise, we have successfully read the whole message */
-	return SUCCESS;
-
-
-}
 
 
 /*

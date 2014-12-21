@@ -1,4 +1,7 @@
 
+#ifndef NIM_PROTOCOL_H
+#define NIM_PROTOCOL_H
+
 /* this unit defines protocol messages sizes, and provides various methods for the client and server to 
    create and handle protocol messages */
 
@@ -182,10 +185,6 @@ typedef struct message_container
 /* get message size in bytes according to its type, used in the method below */
 int get_message_size(int message_type);
 
-/* method that reads a message from the client or from the server, according to the protocol 
-   used for message structs that have message type field ( basiclly all messages except openning_message )
-*/
-int read_message(int sockfd, message_container* container, int* connection_closed);
 
 /*
   method that reads the openning message from the server, used in the client only 
@@ -198,3 +197,5 @@ int read_openning_message(int sockfd, openning_message* msg, int* connection_clo
 #define INVALID_MESSAGE_HEADER 1
 #define CONNECTION_ERROR       2
 #define SUCCESS                0
+
+#endif
