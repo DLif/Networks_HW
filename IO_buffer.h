@@ -1,4 +1,5 @@
-
+#ifndef IO_BUFFER_H
+#define IO_BUFFER_H
 #define MAX_IO_BUFFER_SIZE 2000   /* maximum size of input/output buffer */
 #define OVERFLOW_ERROR     1
 #define INVALID_MESSAGE    2
@@ -55,3 +56,4 @@ int pop(io_buffer* buff, char* target_buffer, int num_bytes);
 
 
 int pop_message(io_buffer* buff, message_container* msg_container);
+#endif
