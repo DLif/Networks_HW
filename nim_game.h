@@ -6,6 +6,7 @@
 #define CLIENT 1
 #define NONE 0
 #define SERVER -1
+#define SOMEONE_VICTORY 1
 
 //this array holds the game heaps
 extern short heaps_array[HEAPS_NUM];
@@ -37,6 +38,8 @@ int getWinningPlayer(int curr_player);
 	this function calculates what move should the server do, and executes it.
 */
 void makeServerMove();
+
+int is_victory();
 
 /*  this function executes a whole nim game round- the user move (his move is given to the function through the parameters)
 	and the computer move that follows it (only if game still continues after client move)

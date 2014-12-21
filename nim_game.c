@@ -65,6 +65,17 @@ int getWinningPlayer(int current_player){
 	return victor;
 }
 
+int is_victory(){
+	int victor = NONE;
+	
+	//this loop check the sizes of all the heaps - if there all empty than the game is over, else we continue;
+	for (int i = 0 ; i < HEAPS_NUM ;i++) {
+		if (heaps_array[i] > 0) return victor; // nobody has won yet
+	}
+
+	return SOMEONE_VICTORY;
+}
+
 /*
 	this function calculates what move should the server do, and executes it.
 */
@@ -93,6 +104,8 @@ void makeServerMove(){
 
 	returns CLIENT for the client victory, NONE if the game isn't over and SERVER for server victory.
 	*isLegalMove will contain false if the user move was ilegal, else true (acked)
+
+	for multiplay- if return SERVER curr player lost, else curr player won
 */
 
 int makeRound(char player_heapNum, short player_size, bool *isLegalMove){
@@ -100,11 +113,15 @@ int makeRound(char player_heapNum, short player_size, bool *isLegalMove){
 	*isLegalMove = makeClientMove((unsigned char)player_heapNum, (unsigned short)player_size);
 	
 	//if this is the last move, this round is over. send data
-	if (getWinningPlayer(CLIENT) != NONE) return getWinningPlayer(CLIENT);
-
-	// otherwise, make the serve move
-	makeServerMove();
-	if (getWinningPlayer(SERVER) != NONE) return getWinningPlayer(SERVER);
+	if (is_victory() != NONE) {
+		if (IsMisere)
+		{
+			return CLIENT;
+		}
+		else{
+			return SERVER;
+		}
+	}
 
 	// game not over
 	return NONE;
