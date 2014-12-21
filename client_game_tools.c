@@ -61,7 +61,8 @@ void print_closed_connection()
 	printf(DISCONNECTED_STR);
 }
 
-#define CONNECTION_REFUSED "Client rejected: too many clients are already connected\n"
+#define CONNECTION_REFUSED "Client rejected: too many clients are already connected\n"
+
 void print_connection_refused()
 {
 	printf(CONNECTION_REFUSED);
