@@ -241,7 +241,7 @@ int read_message(int sockfd, message_container* container, int* connection_close
 
 
 
-int read_openning_message(int sockfd, openning_message* msg, int* connection_closed )
+int read_openning_message(int sockfd, openning_message* msg, int* connection_closed)
 {
 	
 	/* read the first byte first, to whether the connection was accepted */
@@ -273,5 +273,79 @@ int read_openning_message(int sockfd, openning_message* msg, int* connection_clo
 	}
 
 	return SUCCESS;
+
+}
+
+
+/*
+	this method returns 0 if the given message is structually (i.e, each fields receives proper values ) valid 
+	otherwise returns 1
+
+	NOTE: 
+		in case of player to player message the server still needs to check that
+		the ids in the struct are valid, since only the server knows what values are valid
+*/
+
+int valiadate_message(message_container* msg)
+{
+
+	switch(message_type)
+	{
+	case HEAP_UPDATE_MSG:
+		heap_update_message* temp = (heap_update_message*)msg;
+		if (temp->game_over != GAME_OVER && temp->game_over != GAME_CONTINUES)
+			return 1;
+		int i;
+		for(i = 0; i < NUM_HEAPS; ++i)
+		{
+			// check if heap values are valid 
+			if((unsigned short)(temp->heaps[i]) > MAX_HEAP_SIZE)
+				return 1;
+		}
+
+
+		return 0;
+			
+	case CLIENT_TURN_MSG:
+		/* nothing to check */
+		return 0;
+	case ACK_MOVE_MSG:
+		/* nothing to check */
+		return 0;
+	case ILLEGAL_MOVE_MSG:
+		/* nothing to check */
+		return 0;
+	case MSG:
+		
+		client_to_client_message* temp = (client_to_client_message*)msg;
+		/* checks of ids should be done in the server, since it decides the valid ids */
+
+		/* check if length is valid */
+		if((unsigned char)(temp->length) > MAX_MSG_SIZE)
+			return 1;
+
+		return 0;
+	case PROMOTION_MSG:
+		/* nothing to check */
+		return 0;
+	case PLAYER_MOVE_MSG:
+		
+		player_move_msg* temp = (player_move_msg*)msg;
+		/* check number of heaps */
+		if((unsigned char)(temp->heap_index) >= NUM_HEAPS)
+			return 1;
+
+		/* check amount to remove */
+		if((unsigned short)(temp->amount_to_remove) > MAX_HEAP_SIZE)
+		{
+			return 1;
+		}
+
+		return 0;
+
+	default:
+		return -1;     /* error */
+
+	}
 
 }
