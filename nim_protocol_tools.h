@@ -93,7 +93,7 @@ typedef struct heap_update_message
 typedef struct client_turn_message
 {
 	char message_type;               /* CLIENT_TURN_MSG */
-} client_turn_message
+} client_turn_message;
 #pragma pack(pop)
 
 

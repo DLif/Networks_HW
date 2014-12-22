@@ -1,23 +1,13 @@
 #include "advanced_server.h"
 
-#include "nim_game.h"
-
-buffered_socket *clients_array[];
+(buffered_socket *)clients_array[];//TODO
 int max_client_num = 0;
 int num_of_players = 0;
 
 
 int main( int argc, const char* argv[] ){
 	short port = 6325;	//set the port to default
-	//there will be two sockets- one listening at the port and one to comunicate with the server.
-	int listeningSoc,toClientSocket;
-	//in this variable we save the client's address information
-	struct sockaddr_in clientAdderInfo;
-	socklen_t addressSize = sizeof(clientAdderInfo);
-	//this variable resives true iff an error occured during the communication with the client
-	bool error = false;
-	// this variable tells us if the game has ended, and who is the winner in such a case
-	int victor = NONE; 
+	int listeningSoc; //listening socket on port
 
 	//init clients_array
 	init_clients_array();
@@ -55,7 +45,7 @@ void server_loop(int listeningSoc){
 		setWriteSet(&write_set);
 		fd_max = findMax(listeningSoc);
 
-		select(fd_max+1,&read_set,&write_set,NULL,NULL);
+		select(fd_max+1,&read_set,&write_set,NULL,NULL);//TODO error
 
 		//check if there is a new requests to connect - and add it
 		if (FD_ISSET(listeningSoc,&read_set))
@@ -71,7 +61,7 @@ void server_loop(int listeningSoc){
 		}
 
 		//get all client input and handle it
-		game_stat =handle_reading_writing(&read_set,&write_set,clients_array,prev_client_to_move);
+		game_stat =handle_reading_writing(&read_set,&write_set,&prev_client_to_move);
 		if (game_stat == NETWORK_FUNC_FAILURE)
 		{
 			#ifdef __DEBUG__
@@ -84,6 +74,7 @@ void server_loop(int listeningSoc){
 			#ifdef __DEBUG__
 				printf("The game has ended. Existing peacefully");
 			#endif
+			//send all buffers to the bitter end
 			break;
 		}
 	}
@@ -105,7 +96,7 @@ int get_new_connections(int listeningSoc){
 	if(toClientSocket < 0)
 	{
 		printf("Error: failed to accept connection: %s\n", strerror(errno));
-		close_socket(listeningSoc);
+		close(listeningSoc);
 		return NETWORK_FUNC_FAILURE;
 	}
 
@@ -121,17 +112,19 @@ int get_new_connections(int listeningSoc){
 			num_of_players++;
 		}
 		else{
-			new_client = create_buff_socket(toClientSocket,REJECTED);
+			new_client = create_buff_socket(toClientSocket,PLAYER);
 		}
 		clients_array[max_client_num] = new_client;
 		max_client_num++;
 	}
 
+	//TODO send first message- for first byte assume write ready
+
 	return 0;
 }
 
 //handle all input and output to clients (all the game actually)
-int handle_reading_writing(fd_set* read_set,fd_set* write_set,int prev_client_to_move){
+int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *prev_client_to_move){
 	//error indicator
 	int error = 0;
 	//abstract message continer
@@ -141,13 +134,13 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int prev_client_to
 	//get pop status
 	int pop_stat = MSG_NOT_COMPLETE;
 	//who should move this turn
-	int curr_to_play = -1;
+	int curr_to_play = *prev_client_to_move;
 	//game resualt
 	int round_reasult = NONE;
 	bool is_leagel_move = true;
 
 	//read all information into buffers
-	error = read_to_buffs(read_set);
+	error = read_to_buffs(read_set); //TODO
 	if (error == NETWORK_FUNC_FAILURE)
 	{
 		#ifdef __DEBUG__
@@ -157,7 +150,7 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int prev_client_to
 	}
 
 	//send iformation from write buffes to ready sockes
-	error = send_info(write_set);
+	error = send_info(write_set); //TODO
 	if (error == NETWORK_FUNC_FAILURE)
 	{
 		#ifdef __DEBUG__
@@ -166,8 +159,6 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int prev_client_to
 		return NETWORK_FUNC_FAILURE;
 	}
 
-	//claculate who should move now
-	curr_to_play = calc_next_player(prev_client_to_move);
 
 	//pop all whole commands - and handle chat and quit
 	for (int i = 0; i < max_client_num; ++i)
@@ -179,9 +170,8 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int prev_client_to
 		if (pop_stat == MSG_NOT_COMPLETE) continue;
 		else if (pop_stat == INVALID_MESSAGE)
 		{
-			#ifdef __DEBUG__
-				printf("Errors in reading from input buffers - buffer of client %d",i);
-			#endif
+			//undefined message
+			printf("Errors in reading from input buffers - buffer of client %d",i);
 			return NETWORK_FUNC_FAILURE;
 		}
 		else { //must be pop_stat == SUCCESS
@@ -192,51 +182,38 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int prev_client_to
 			else if (abs_message->message_type == MSG){//
 				error = chat_message_handle(i,abs_message);
 			}
-			else {//quit message
+			else {
 				error = quit_client_handle(i);
 			}
 		}
 	}
 
-
-	//handle game
-	round_reasult = makeRound(game_move->heap_index,game_move->amount_to_remove,&is_leagel_move);
-	free(game_move);
-
-	//send create_heap_update_message to all
-	heap_update_message* heap_mes= (heap_update_message*)malloc(sizeof(heap_update_message));
-	for (int i = 0; i < max_client_num; ++i)
+	if (game_move != NULL)
 	{
-		error = push(clients_array[j]->output_buffer,(char*)heap_mes,sizeof(heap_update_message));
-	}
-	free(heap_mes);
+		//handle game
+		round_reasult = makeRound(game_move->heap_index,game_move->amount_to_remove,&is_leagel_move);
+		free(game_move);
+		
 
-	
-	if (round_reasult == NONE)
-	{
-		//send correct or ileagel message
-		if (!is_leagel_move)
+		if (round_reasult == NONE)//the game continue
 		{
-			illegal_move_message *illegal_move = (illegal_move_message*)malloc(sizeof(illegal_move_message));
-			//fill send buff
-			create_illegal_move_message(illegal_move);
-			//push message
-			error = push(clients_array[curr_to_play]->output_buffer,(char*)illegal_move,sizeof(illegal_move_message));
-			free(illegal_move);
+			error = send_move_leagelness(curr_to_play,is_leagel_move);
+			error = send_heap_mss_to_all(GAME_CONTINUES);
 		}
 		else {
-			ack_move_message *legal_move = (illegal_move_message*)malloc(sizeof(illegal_move_message));
-			//fill send buff
-			create_illegal_move_message(legal_move);
-			//push message
-			error = push(clients_array[curr_to_play]->output_buffer,(char*)legal_move,sizeof(illegal_move));
-			free(legal_move);
+			error = send_move_leagelness(curr_to_play,is_leagel_move);
+			error = send_heap_mss_to_all(GAME_OVER);
+			return END_GAME;
 		}
+
+		//updated next client to move only when a move was done to move  
+		//TODO :check prev_client_to_move really moved
+		curr_to_play = calc_next_player(*prev_client_to_move);
 	}
-	else {
-		//send victory message to all
-	}
-	return 0;
+
+	//set who was prev to play
+	*prev_client_to_move=curr_to_play;
+	return 1;
 }
 
 int initServer(short port){
@@ -326,9 +303,9 @@ int chat_message_handle(int sender,message_container *abs_message){
 	}
 	else {
 		//check dest validity
-		if (clients_array[chat_header->destination_id] != NULL)
+		if (clients_array[(int)(chat_header->destination_id)] != NULL)
 		{
-			error = push(clients_array[chat_header->destination_id]->output_buffer,send_buff,sizeof(chat_header)+chat_header->length+1);
+			error = push(clients_array[(int)(chat_header->destination_id)]->output_buffer,send_buff,sizeof(chat_header)+chat_header->length+1);
 		}
 	}
 
@@ -337,6 +314,8 @@ int chat_message_handle(int sender,message_container *abs_message){
 }
 
 int game_message_handle(int curr_to_play,int curr_user,message_container** message_container_p,player_move_msg** game_move_p){
+	int error =0;
+
 	if (curr_user == curr_to_play)
 	{
 		//point game_move to the new message_container
@@ -357,6 +336,7 @@ int game_message_handle(int curr_to_play,int curr_user,message_container** messa
 }
 
 int quit_client_handle(int quiting_client){
+	int error =0;
 	if (clients_array[quiting_client]->client_stat == PLAYER)
 	{
 		num_of_players--;
@@ -365,7 +345,7 @@ int quit_client_handle(int quiting_client){
 		for (int j = quiting_client; j < max_client_num; ++j)
 		{
 			if (clients_array[j] == NULL) continue;
-			if (clients_array[j]->client_stat == PLAYER) continue;
+			else if (clients_array[j]->client_stat == PLAYER) continue;
 
 			//promote one SPECTATOR
 			clients_array[j]->client_stat == PLAYER;
@@ -379,5 +359,55 @@ int quit_client_handle(int quiting_client){
 	}
 	else{
 		free_buff_socket(clients_array[quiting_client]);
+	}
+	return 0;
+}
+
+int send_heap_mss_to_all(int is_victory){
+	heap_update_message* heap_mes= (heap_update_message*)malloc(sizeof(heap_update_message));
+	create_heap_update_message(heap_mes,heaps_array,is_victory);
+	for (int i = 0; i < max_client_num; ++i)
+	{
+		error = push(clients_array[i]->output_buffer,(char*)heap_mes,sizeof(heap_update_message));
+		if (error == -1)
+		{
+			printf("error in pushing heap_update_message to client:%d\n",i);
+		}
+	}
+	free(heap_mes);
+	return 0;
+}
+	
+int  send_move_leagelness(int curr_to_play,bool is_leagel_move){
+	int error =0;
+
+	if (!is_leagel_move)
+	{
+		illegal_move_message *illegal_move = (illegal_move_message*)malloc(sizeof(illegal_move_message));
+		//fill send buff
+		create_illegal_move_message(illegal_move);
+		//push message
+		error = push(clients_array[curr_to_play]->output_buffer,(char*)illegal_move,sizeof(illegal_move_message));
+		if (error == OVERFLOW_ERROR)
+		{
+			printf("can't push leagel_move to %d\n",curr_to_play);
+			free(illegal_move);
+			return NETWORK_FUNC_FAILURE;
+		}
+		free(illegal_move);
+	}
+	else {
+		ack_move_message *legal_move = (ack_move_message*)malloc(sizeof(ack_move_message));
+		//fill send buff
+		create_illegal_move_message(legal_move);
+		//push message
+		error = push(clients_array[curr_to_play]->output_buffer,(char*)legal_move,sizeof(ack_move_message));
+		if (error == OVERFLOW_ERROR)
+		{
+			printf("can't push leagel_move to %d\n",curr_to_play);
+			free(legal_move);
+			return NETWORK_FUNC_FAILURE;
+		}
+		free(legal_move);
 	}
 }

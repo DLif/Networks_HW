@@ -1,6 +1,7 @@
-#ifndef IO_BUFFER_H
-#define IO_BUFFER_H
+
 #include "IO_buffer.h"
+#include <malloc.h>
+#include <stdio.h>
 
 
 #define PLAYER 1
@@ -41,5 +42,3 @@ buffered_socket* create_buff_socket(int sockfd,int client_new_stat);
 void free_buff_socket(buffered_socket* sock);
 
 
-
-#endif
