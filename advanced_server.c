@@ -1,6 +1,6 @@
 #include "advanced_server.h"
 
-(buffered_socket *)clients_array[];//TODO
+(buffered_socket *)clients_array[MAX_CLIENT_NUM];
 int max_client_num = 0;
 int num_of_players = 0;
 
@@ -26,6 +26,15 @@ int main( int argc, const char* argv[] ){
 #endif
 
 	server_loop(listeningSoc);
+
+	//free all clients_array
+	for (int i = 0; i < max_client_num; ++i)
+	{
+		//if client not alive - don't try anything
+		if (clients_array[i] == NULL) continue;
+
+		free_buff_socket(clients_array[i]);
+	}
 }
 
 //this function holds the server live loop
@@ -37,7 +46,7 @@ void server_loop(int listeningSoc){
 	//we will use this number to determine which player should do the next move
 	int prev_client_to_move = 0;
 	//game_stat will report errors or end game
-	int game_stat = 0;
+	int game_stat = 1;
 
 	while(1){
 		//prepare for select
@@ -45,7 +54,42 @@ void server_loop(int listeningSoc){
 		setWriteSet(&write_set);
 		fd_max = findMax(listeningSoc);
 
-		select(fd_max+1,&read_set,&write_set,NULL,NULL);//TODO error
+		error = select(fd_max+1,&read_set,&write_set,NULL,NULL);
+		if (error == NETWORK_FUNC_FAILURE)
+		{
+			printf("error in select : ");
+			printf("%s\n",errno );
+			break;
+		}
+
+		if (game_stat == END_GAME)
+		{
+			bool finished_sending = true;
+			//check if all buffers are empty
+			for (int i = 0; i < max_client_num; ++i)
+			{
+				//if client not alive - don't try anything
+				if (clients_array[i] == NULL) continue;
+				if (clients_array[i]->output_buffer->size > 0)
+				{
+					finished_sending = false;
+				}
+			}
+
+			if (!finished_sending)
+			{
+				error = send_info(&write_set); 
+				if (error == NETWORK_FUNC_FAILURE)
+				{
+					printf("Errors in sending after game end");
+					return NETWORK_FUNC_FAILURE;
+				}
+			}
+			else{
+				return 0;
+			}
+			continue;
+		}
 
 		//check if there is a new requests to connect - and add it
 		if (FD_ISSET(listeningSoc,&read_set))
@@ -53,9 +97,7 @@ void server_loop(int listeningSoc){
 			game_stat = get_new_connections(listeningSoc);
 			if (game_stat == NETWORK_FUNC_FAILURE)
 			{
-				#ifdef __DEBUG__
-					printf("Error making new connection");
-				#endif
+				printf("Error making new connection");
 				break;
 			}
 		}
@@ -64,18 +106,12 @@ void server_loop(int listeningSoc){
 		game_stat =handle_reading_writing(&read_set,&write_set,&prev_client_to_move);
 		if (game_stat == NETWORK_FUNC_FAILURE)
 		{
-			#ifdef __DEBUG__
-				printf("Error in handle_reading_writing function");
-			#endif
+			printf("Error in handle_reading_writing function");
 			break;
 		}
 		else if (game_stat == END_GAME)
 		{
-			#ifdef __DEBUG__
-				printf("The game has ended. Existing peacefully");
-			#endif
-			//send all buffers to the bitter end
-			break;
+			printf("The game has ended. Existing peacefully");
 		}
 	}
 }
@@ -83,6 +119,7 @@ void server_loop(int listeningSoc){
 //this function accept new connections and add them to the list(if any)
 //return the new maximum of numbers of clients
 int get_new_connections(int listeningSoc){
+	int error = 0;
 	//in this variable we save the client's address information
 	struct sockaddr_in clientAdderInfo;
 	socklen_t addressSize = sizeof(clientAdderInfo);
@@ -90,6 +127,8 @@ int get_new_connections(int listeningSoc){
 	int toClientSocket = -1;
 	//new client struct
 	buffered_socket* new_client =NULL;
+	//first message struct
+	client_turn_message first_msg;
 
 	//accept the connection from the client
 	toClientSocket = accept(listeningSoc,(struct sockaddr*) &clientAdderInfo,&addressSize);
@@ -102,7 +141,10 @@ int get_new_connections(int listeningSoc){
 
 	if (max_client_num >= MAX_CLIENT_NUM)
 	{
-		//TODO
+		//assume working and write ready.
+		client_turn_message invalid_msg;
+		create_client_turn_message(&invalid_msg);
+		send(toClientSocket,(char*)(&invalid_msg),1,0);
 	}
 	else{
 		//add new connection to clients_array and append max_client_num
@@ -118,7 +160,9 @@ int get_new_connections(int listeningSoc){
 		max_client_num++;
 	}
 
-	//TODO send first message- for first byte assume write ready
+	//send first message- for first byte assume write ready
+	create_heap_update_message(&first_msg,heaps_array,0);
+	error = push(new_client->output_buffer,(char*)(&first_msg),sizeof(client_turn_message));
 
 	return 0;
 }
@@ -134,13 +178,13 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *prev_client_t
 	//get pop status
 	int pop_stat = MSG_NOT_COMPLETE;
 	//who should move this turn
-	int curr_to_play = *prev_client_to_move;
+	int curr_to_play = *prev_client_to_move;//in case no move was done,prev_client_to_move will remain the same
 	//game resualt
 	int round_reasult = NONE;
 	bool is_leagel_move = true;
 
 	//read all information into buffers
-	error = read_to_buffs(read_set); //TODO
+	error = read_to_buffs(read_set);
 	if (error == NETWORK_FUNC_FAILURE)
 	{
 		#ifdef __DEBUG__
@@ -150,7 +194,7 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *prev_client_t
 	}
 
 	//send iformation from write buffes to ready sockes
-	error = send_info(write_set); //TODO
+	error = send_info(write_set); 
 	if (error == NETWORK_FUNC_FAILURE)
 	{
 		#ifdef __DEBUG__
@@ -207,7 +251,6 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *prev_client_t
 		}
 
 		//updated next client to move only when a move was done to move  
-		//TODO :check prev_client_to_move really moved
 		curr_to_play = calc_next_player(*prev_client_to_move);
 	}
 
@@ -285,7 +328,7 @@ int chat_message_handle(int sender,message_container *abs_message){
 	//this is chat message
 	client_to_client_message *chat_header = (client_to_client_message*)abs_message;
 	//allocate space for send_buff
-	send_buff = (char*) malloc(sizeof(chat_header)+chat_header->length+1);//+1 for NULL
+	send_buff = (char*) malloc(sizeof(client_to_client_message)+chat_header->length+1);//+1 for NULL
 	//fill send_buff
 	send_buff[0]=chat_header->message_type;
 	send_buff[1]=chat_header->sender_id;
@@ -298,14 +341,14 @@ int chat_message_handle(int sender,message_container *abs_message){
 		//run over all and send
 		for (int i = 0; i < max_client_num; ++i)
 		{
-			error = push(clients_array[i]->output_buffer,send_buff,sizeof(chat_header)+chat_header->length+1);
+			error = push(clients_array[i]->output_buffer,send_buff,sizeof(client_to_client_message)+chat_header->length+1);
 		}
 	}
 	else {
-		//check dest validity
+		//check dest validity and send to spesicik client
 		if (clients_array[(int)(chat_header->destination_id)] != NULL)
 		{
-			error = push(clients_array[(int)(chat_header->destination_id)]->output_buffer,send_buff,sizeof(chat_header)+chat_header->length+1);
+			error = push(clients_array[(int)(chat_header->destination_id)]->output_buffer,send_buff,sizeof(client_to_client_message)+chat_header->length+1);
 		}
 	}
 
@@ -341,6 +384,7 @@ int quit_client_handle(int quiting_client){
 	{
 		num_of_players--;
 		free_buff_socket(clients_array[quiting_client]);
+		clients_array[quiting_client] = NULL;//so we will know that the client is dead
 		//try to promote player
 		for (int j = quiting_client; j < max_client_num; ++j)
 		{
@@ -359,6 +403,7 @@ int quit_client_handle(int quiting_client){
 	}
 	else{
 		free_buff_socket(clients_array[quiting_client]);
+		clients_array[quiting_client] = NULL;
 	}
 	return 0;
 }
@@ -410,4 +455,113 @@ int  send_move_leagelness(int curr_to_play,bool is_leagel_move){
 		}
 		free(legal_move);
 	}
+}
+
+//this function run over all clients and fills the input buffers with information sent by client
+int read_to_buffs(fd_set* read_set){
+	int error = 0;
+	int cur_socket = -1;//the socket we are currently pulling info from recive
+	message_container input_msg;
+	int resvied_size =0;
+	for (int i = 0; i < max_client_num; ++i)
+	{
+		//if client not alive - don't try anything
+		if (clients_array[i] == NULL) continue;
+
+		cur_socket = clients_array[i]->sockfd;
+		if (FD_ISSET(cur_socket,read_set)){
+			resvied_size = resv(cur_socket,(char*)(&input_msg),sizeof(message_container),0);
+			if (resvied_size < 0)
+			{
+				printf("Error reading from socket of client number %d\n",i );
+				return NETWORK_FUNC_FAILURE;
+			}
+			else if (resvied_size == 0) //in this case - connection broken by user quit
+			{
+				quit_client_handle(i);
+			}
+			error = push(clients_array[i]->input_buffer,(char*)(&input_msg),resvied_size);
+			if (error == NETWORK_FUNC_FAILURE)
+			{
+				printf("Error pushing to input buffer of client number %d\n in read_to_buffs",i );
+				return NETWORK_FUNC_FAILURE;
+			}
+		}
+	}
+	return 0;
+}
+
+int send_info(fd_set* write_set){
+	int error = 0;
+	int cur_socket = -1;//the socket we are currently pulling info from recive
+	message_container input_msg;
+	int resvied_size =0;
+	for (int i = 0; i < max_client_num; ++i)
+	{
+		//if client not alive - don't try anything
+		if (clients_array[i] == NULL) continue;
+
+		cur_socket = clients_array[i]->sockfd;
+		if (FD_ISSET(cur_socket,write_set)){
+			//get message
+			error = pop_message(clients_array[i]->output_buffer,&input_msg){
+				printf("Error pop_message from socket of client number %d in send_info\n",i );
+				return NETWORK_FUNC_FAILURE;
+			}
+			//try to send it
+			resvied_size = send(cur_socket,(char*)(&input_msg),sizeof(message_container),0);
+			if (resvied_size < 0)
+			{
+				printf("Error sending to socket of client number %d\n",i );
+				return NETWORK_FUNC_FAILURE;
+			}
+			//push the rest of what we didn't manage to sent
+			error = push(clients_array[i]->output_buffer,((char*)(&input_msg))+resvied_size,sizeof(message_container)-resvied_size);
+			if (error == NETWORK_FUNC_FAILURE)
+			{
+				printf("Error pushing to output buffer the unsent part of client number %d\n in send_info",i );
+				return NETWORK_FUNC_FAILURE;
+			}
+		}
+	}
+	return 0;
+}
+
+void setReadSet(fd_set* read_set,int listeningSoc){
+	FD_ZERO(read_set);
+	FD_SET(listeningSoc,read_set);
+	for (int i = 0; i < max_client_num; ++i)
+	{
+		//if client not alive - don't try anything
+		if (clients_array[i] == NULL) continue;
+
+		FD_SET(clients_array[i]->sockfd,read_set);
+	}
+}
+
+void setWriteSet(fd_set* write_set){
+	FD_ZERO(write_set);
+	for (int i = 0; i < max_client_num; ++i)
+	{
+		//if client not alive - don't try anything
+		if (clients_array[i] == NULL) continue;
+
+		FD_SET(clients_array[i]->sockfd,write_set);
+	}
+}
+
+//this function will find the max socket number. used for select
+int findMax(int listeningSoc){
+	int max = listeningSoc;
+	for (int i = 0; i < max_client_num; ++i)
+	{
+		//if client not alive - don't try anything
+		if (clients_array[i] == NULL) continue;
+
+		if (max < clients_array[i]->sockfd)
+		{
+			max = clients_array[i]->sockfd;
+		}
+	}
+	return max;
 }

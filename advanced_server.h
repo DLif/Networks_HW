@@ -49,3 +49,15 @@ int game_message_handle(int curr_to_play,int curr_user,message_container** messa
 int quit_client_handle(int quiting_client);
 
 int send_heap_mss_to_all();
+
+int  send_move_leagelness(int curr_to_play,bool is_leagel_move);
+
+int read_to_buffs(fd_set* read_set);
+
+int send_info(fd_set* write_set);
+
+void setReadSet(fd_set* read_set,int listeningSoc);
+
+void setWriteSet(fd_set* write_set);
+
+int findMax(int listeningSoc);
