@@ -1,6 +1,6 @@
 #include "advanced_server.h"
 
-(buffered_socket *)clients_array[MAX_CLIENT_NUM];
+buffered_socket *clients_array[MAX_CLIENT_NUM];
 int max_client_num = 0;
 int num_of_players = 0;
 
@@ -38,7 +38,7 @@ int main( int argc, const char* argv[] ){
 }
 
 //this function holds the server live loop
-void server_loop(int listeningSoc){
+int server_loop(int listeningSoc){
 	//thous are the "select variables"
 	fd_set read_set;
 	fd_set write_set;
@@ -47,6 +47,7 @@ void server_loop(int listeningSoc){
 	int prev_client_to_move = 0;
 	//game_stat will report errors or end game
 	int game_stat = 1;
+	int error =0;
 
 	while(1){
 		//prepare for select
@@ -57,9 +58,8 @@ void server_loop(int listeningSoc){
 		error = select(fd_max+1,&read_set,&write_set,NULL,NULL);
 		if (error == NETWORK_FUNC_FAILURE)
 		{
-			printf("error in select : ");
-			printf("%s\n",errno );
-			break;
+			printf("error in select ");
+			return NETWORK_FUNC_FAILURE;
 		}
 
 		if (game_stat == END_GAME)
@@ -98,7 +98,7 @@ void server_loop(int listeningSoc){
 			if (game_stat == NETWORK_FUNC_FAILURE)
 			{
 				printf("Error making new connection");
-				break;
+				return NETWORK_FUNC_FAILURE;
 			}
 		}
 
@@ -107,13 +107,15 @@ void server_loop(int listeningSoc){
 		if (game_stat == NETWORK_FUNC_FAILURE)
 		{
 			printf("Error in handle_reading_writing function");
-			break;
+			return NETWORK_FUNC_FAILURE;
 		}
 		else if (game_stat == END_GAME)
 		{
 			printf("The game has ended. Existing peacefully");
 		}
 	}
+	//should never get here
+	return NETWORK_FUNC_FAILURE;
 }
 
 //this function accept new connections and add them to the list(if any)
@@ -128,7 +130,7 @@ int get_new_connections(int listeningSoc){
 	//new client struct
 	buffered_socket* new_client =NULL;
 	//first message struct
-	client_turn_message first_msg;
+	openning_message first_msg;
 
 	//accept the connection from the client
 	toClientSocket = accept(listeningSoc,(struct sockaddr*) &clientAdderInfo,&addressSize);
@@ -142,8 +144,8 @@ int get_new_connections(int listeningSoc){
 	if (max_client_num >= MAX_CLIENT_NUM)
 	{
 		//assume working and write ready.
-		client_turn_message invalid_msg;
-		create_client_turn_message(&invalid_msg);
+		openning_message invalid_msg;
+		create_openning_message_negative(&invalid_msg);
 		send(toClientSocket,(char*)(&invalid_msg),1,0);
 	}
 	else{
@@ -161,8 +163,13 @@ int get_new_connections(int listeningSoc){
 	}
 
 	//send first message- for first byte assume write ready
-	create_heap_update_message(&first_msg,heaps_array,0);
+	create_openning_message(&first_msg,IsMisere,num_of_players,max_client_num-1,new_client->client_stat);
 	error = push(new_client->output_buffer,(char*)(&first_msg),sizeof(client_turn_message));
+	if (error == NETWORK_FUNC_FAILURE)
+	{
+		printf("unable to push first message to client %d\n",max_client_num-1);
+		return NETWORK_FUNC_FAILURE;
+	}
 
 	return 0;
 }
@@ -276,14 +283,14 @@ int initServer(short port){
 	// try to bind to given port
 	if ( bind(listeningSocket,(struct sockaddr*) &adderInfo, sizeof(adderInfo)) < 0 ){
 		printf("Error: failed to bind listening socket: %s\n", strerror(errno));
-		close_socket(listeningSocket);
+		close(listeningSocket);
 		return NETWORK_FUNC_FAILURE;
 	}
 
 	// listen to connections
 	if ( listen(listeningSocket, AWATING_CLIENTS_NUM) < 0){
 		printf("Error: listening error: %s\n", strerror(errno));
-		close_socket(listeningSocket);
+		close(listeningSocket);
 		return NETWORK_FUNC_FAILURE;
 	}
 	return listeningSocket;
@@ -335,20 +342,35 @@ int chat_message_handle(int sender,message_container *abs_message){
 	send_buff[2]=chat_header->destination_id;
 	send_buff[3]=chat_header->length;
 	error = pop(clients_array[sender]->output_buffer,send_buff+4,chat_header->length);
+	if (error == 1)
+	{
+		printf("error poping client %d chat message\n", sender);
+		return NETWORK_FUNC_FAILURE;
+	}
 
 	if (chat_header->destination_id == -1)
 	{
 		//run over all and send
 		for (int i = 0; i < max_client_num; ++i)
 		{
-			error = push(clients_array[i]->output_buffer,send_buff,sizeof(client_to_client_message)+chat_header->length+1);
+			error = push(clients_array[i]->output_buffer,send_buff,sizeof(client_to_client_message)+chat_header->length);
+			if (error == OVERFLOW_ERROR)
+			{
+				printf("error pushing chat to client %d\n", i);
+				return NETWORK_FUNC_FAILURE;
+			}
 		}
 	}
 	else {
 		//check dest validity and send to spesicik client
 		if (clients_array[(int)(chat_header->destination_id)] != NULL)
 		{
-			error = push(clients_array[(int)(chat_header->destination_id)]->output_buffer,send_buff,sizeof(client_to_client_message)+chat_header->length+1);
+			error = push(clients_array[(int)(chat_header->destination_id)]->output_buffer,send_buff,sizeof(client_to_client_message)+chat_header->length);
+			if (error == OVERFLOW_ERROR)
+			{
+				printf("error pushing chat to client %d\n", (int)(chat_header->destination_id));
+				return NETWORK_FUNC_FAILURE;
+			}
 		}
 	}
 
@@ -373,6 +395,11 @@ int game_message_handle(int curr_to_play,int curr_user,message_container** messa
 		create_illegal_move_message(illegal_move);
 		//push message
 		error = push(clients_array[curr_user]->output_buffer,(char*)illegal_move,sizeof(illegal_move_message));
+		if (error == OVERFLOW_ERROR)
+		{
+			printf("error pushing illegal_move to client %d\n", curr_user);
+			return NETWORK_FUNC_FAILURE;
+		}
 		free(illegal_move);
 	}
 	return 0;
@@ -392,12 +419,17 @@ int quit_client_handle(int quiting_client){
 			else if (clients_array[j]->client_stat == PLAYER) continue;
 
 			//promote one SPECTATOR
-			clients_array[j]->client_stat == PLAYER;
+			clients_array[j]->client_stat = PLAYER;
 			promotion_msg *promote_mes = (promotion_msg*)malloc(sizeof(promotion_msg));
 			//fill send buff
-			create_illegal_move_message(promote_mes);
+			create_promotion_message(promote_mes);
 			//push message
 			error = push(clients_array[j]->output_buffer,(char*)promote_mes,sizeof(promotion_msg));
+			if (error == OVERFLOW_ERROR)
+			{
+				printf("error pushing promote_messsage to client %d\n", j);
+				return NETWORK_FUNC_FAILURE;
+			}
 			free(promote_mes);
 		}
 	}
@@ -409,12 +441,14 @@ int quit_client_handle(int quiting_client){
 }
 
 int send_heap_mss_to_all(int is_victory){
+	int error =0;
+
 	heap_update_message* heap_mes= (heap_update_message*)malloc(sizeof(heap_update_message));
 	create_heap_update_message(heap_mes,heaps_array,is_victory);
 	for (int i = 0; i < max_client_num; ++i)
 	{
 		error = push(clients_array[i]->output_buffer,(char*)heap_mes,sizeof(heap_update_message));
-		if (error == -1)
+		if (error == OVERFLOW_ERROR)
 		{
 			printf("error in pushing heap_update_message to client:%d\n",i);
 		}
@@ -444,7 +478,7 @@ int  send_move_leagelness(int curr_to_play,bool is_leagel_move){
 	else {
 		ack_move_message *legal_move = (ack_move_message*)malloc(sizeof(ack_move_message));
 		//fill send buff
-		create_illegal_move_message(legal_move);
+		create_ack_move_message(legal_move);
 		//push message
 		error = push(clients_array[curr_to_play]->output_buffer,(char*)legal_move,sizeof(ack_move_message));
 		if (error == OVERFLOW_ERROR)
@@ -455,6 +489,7 @@ int  send_move_leagelness(int curr_to_play,bool is_leagel_move){
 		}
 		free(legal_move);
 	}
+	return 0;
 }
 
 //this function run over all clients and fills the input buffers with information sent by client
@@ -470,7 +505,7 @@ int read_to_buffs(fd_set* read_set){
 
 		cur_socket = clients_array[i]->sockfd;
 		if (FD_ISSET(cur_socket,read_set)){
-			resvied_size = resv(cur_socket,(char*)(&input_msg),sizeof(message_container),0);
+			resvied_size = recv(cur_socket,(char*)(&input_msg),sizeof(message_container),0);
 			if (resvied_size < 0)
 			{
 				printf("Error reading from socket of client number %d\n",i );
@@ -494,7 +529,6 @@ int read_to_buffs(fd_set* read_set){
 int send_info(fd_set* write_set){
 	int error = 0;
 	int cur_socket = -1;//the socket we are currently pulling info from recive
-	message_container input_msg;
 	int resvied_size =0;
 	for (int i = 0; i < max_client_num; ++i)
 	{
@@ -503,15 +537,20 @@ int send_info(fd_set* write_set){
 
 		cur_socket = clients_array[i]->sockfd;
 		if (FD_ISSET(cur_socket,write_set)){
+			int is_connection_closed =0 ;
 			//try to send all the buffer
-			resvied_size = send(cur_socket,(char*)(clients_array[i]->output_buffer),clients_array[i]->output_buffer->size,0);
+			resvied_size = send_partially(cur_socket,(char*)(clients_array[i]->output_buffer),clients_array[i]->output_buffer->size,&is_connection_closed);
 			if (resvied_size < 0)
 			{
 				printf("Error sending to socket of client number %d\n",i );
 				return NETWORK_FUNC_FAILURE;
 			}
+			if (is_connection_closed == 1)
+			{
+				quit_client_handle(i);
+			}
 			//pop all the information we was able to send
-			error = pop(clients_array[i]->output_buffer,resvied_size);
+			error =pop_no_return(clients_array[i]->output_buffer,resvied_size);
 			if (error == NETWORK_FUNC_FAILURE)
 			{
 				printf("Error pushing to output buffer the unsent part of client number %d\n in send_info",i );

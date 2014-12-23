@@ -18,12 +18,10 @@
 #include <sys/ioctl.h>
 
 
-#include "nim_protocol_tools.h"
 #include "socket_IO_tools.h"
 #include "client_game_tools.h"
 #include "client.h"
-#include "buffered_socket.h"
-#include "IO_buffer.h"
+#include "buffered_socket.h"//inside IO_buffer and nim_protocol_tools
 
 #define DEFAULT_HOST    "localhost"
 #define DEFAULT_PORT    "6325"

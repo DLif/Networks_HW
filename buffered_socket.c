@@ -11,6 +11,8 @@
 	if a malloc error occured, frees resources, prints error and returns NULL
 	else, the allocated object is returned 
 
+	client_new_stat tells as is the cilent PLAYER, SPECTATOR
+
 */
 
 buffered_socket* create_buff_socket(int sockfd, int type)

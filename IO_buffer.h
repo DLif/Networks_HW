@@ -62,4 +62,6 @@ int pop_no_return(io_buffer* buff, int num_bytes);
 
 
 int pop_message(io_buffer* buff, message_container* msg_container);
+
+int valiadate_message(message_container* msg_container);
 #endif 

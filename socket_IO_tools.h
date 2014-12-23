@@ -1,6 +1,6 @@
 /* this unit provides useful methods for handling socket IO */
-#ifndef SOCKET_IO_H
-#define SOCKET_IO_H
+#ifndef SOCKET_IO_TOOLS_H
+#define SOCKET_IO_TOOLS_H
 #define SERVER_MESSAGE_SIZE 9
 
 /* 

@@ -1,5 +1,5 @@
-#ifndef BUFFERED_SOCKET_H
-#define BUFFERED_SOCKET_H
+//#ifndef BUFFERED_SOCKET_H
+//#define BUFFERED_SOCKET_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,4 +49,4 @@ void free_buff_socket(buffered_socket* sock);
 
 
 
-#endif
+//#endif

@@ -17,6 +17,7 @@
 #include "nim_protocol_tools.h"
 #include "IO_buffer.h"
 #include "nim_game.h"
+#include "socket_IO_tools.h"
 
 #define NETWORK_FUNC_FAILURE -1 /* error code */
 #define END_GAME 1
@@ -30,11 +31,11 @@
 
 int main( int argc, const char* argv[] );
 
-void server_loop(int listeningSoc);
+int server_loop(int listeningSoc);
 
 int get_new_connections(int listeningSoc);
 
-int handle_reading_writing(fd_set* read_set,fd_set* write_set,int prev_client_to_move);
+int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *prev_client_to_move);
 
 int initServer(short port);
 
