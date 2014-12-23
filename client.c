@@ -618,8 +618,8 @@ void handle_openning_message()
 	client_id   = (unsigned char)msg.client_id;
 
 	// create a bufferd socket for buffering input and output to/from socket
-	// since the socket is a server, the type field is irrelevant
-	buff_socket = create_buff_socket(sockfd, 0);
+	// since the socket is a server, the type field and client id is irrelevant
+	buff_socket = create_buff_socket(sockfd, 0, 0);
 	if(buff_socket == NULL)
 	{
 		// malloc error

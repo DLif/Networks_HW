@@ -19,6 +19,7 @@ typedef struct buffered_socket
 {
 	int sockfd;                         
 	int client_stat;                          /* client status/type: SPECTATOR or PLAYER*/
+	int client_id;                            /* client id                              */
 	struct io_buffer* input_buffer;
 	struct io_buffer* output_buffer;
 	struct buffered_socket* next_client;      /* in case of a client, list, points to the next client */
@@ -31,13 +32,14 @@ typedef struct buffered_socket
 	this method allocates a new buffered socket
 	handles and prints errors
 	type - in case of a client, holds type of client
+	client_id - in case of a client, holds id of client
 
 	if a malloc error occured, frees resources, prints error and returns NULL
 	else, the allocated object is returned 
 
 */
 
-buffered_socket* create_buff_socket(int sockfd, int status);
+buffered_socket* create_buff_socket(int sockfd, int status, int client_id);
 
 
 /*
