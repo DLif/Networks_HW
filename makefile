@@ -3,7 +3,7 @@ FLAGS= -Wall -g -lm -std=gnu99 -pedantic-errors
 all: nim-server nim
 
 clean:
-	-rm nim nim-server client.o client_game_tools.o nim_protocol_tools.o socket_IO_tools.o nim_game.o advanced_server.o
+	-rm nim nim-server client.o client_game_tools.o nim_protocol_tools.o socket_IO_tools.o advanced_server.o nim_game.o IO_buffer.o buffered_socket.o
 
 nim: client.o client_game_tools.o nim_protocol_tools.o socket_IO_tools.o buffered_socket.o IO_buffer.o 
 	gcc -o $@ $^ $(FLAGS)

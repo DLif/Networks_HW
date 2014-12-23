@@ -152,11 +152,11 @@ int get_new_connections(int listeningSoc){
 		//add new connection to clients_array and append max_client_num
 		if (num_of_players >= AWATING_CLIENTS_NUM)
 		{
-			new_client = create_buff_socket(toClientSocket,SPECTATOR);
+			new_client = create_buff_socket(toClientSocket,SPECTATOR,num_of_players);
 			num_of_players++;
 		}
 		else{
-			new_client = create_buff_socket(toClientSocket,PLAYER);
+			new_client = create_buff_socket(toClientSocket,PLAYER,num_of_players);
 		}
 		clients_array[max_client_num] = new_client;
 		max_client_num++;
