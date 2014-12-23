@@ -125,7 +125,7 @@ int send_partially(int sockfd, char* buffer, int num_bytes, int* connection_clos
 	
 
 		/* send without recieved sigpipe signal */
-	int	num_sent = send(sockfd, buffer + total_sent, bytes_left, MSG_NOSIGNAL);
+	int	num_sent = send(sockfd, buffer , num_bytes, MSG_NOSIGNAL);
 	
 
 	if(num_sent == -1)

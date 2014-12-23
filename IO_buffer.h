@@ -1,6 +1,5 @@
 #ifndef IO_BUFFER_H
 #define IO_BUFFER_H
-
 #include "nim_protocol_tools.h"
 
 #define MAX_IO_BUFFER_SIZE 2000   /* maximum size of input/output buffer */
@@ -41,6 +40,10 @@ int push(io_buffer* buff, char* source_buffer, int num_bytes);
 int pop(io_buffer* buff, char* target_buffer, int num_bytes);
 
 
+/* same as previous, no target buffer */
+int pop_no_return(io_buffer* buff, int num_bytes);
+
+
 /*
 
 	this method pops a message from the given buff struct, puts the result in msg_container
@@ -59,15 +62,4 @@ int pop(io_buffer* buff, char* target_buffer, int num_bytes);
 
 
 int pop_message(io_buffer* buff, message_container* msg_container);
-
-/*
-	this method pops the first num_bytes from the buffer
-	the method returns 1 on error (num_bytes too big)
-
-	or 0 on success
-*/
-
-int pop(io_buffer* buff, int num_bytes);
-
-int valiadate_message(message_container* msg_container);
-#endif
+#endif 

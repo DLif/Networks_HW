@@ -196,7 +196,7 @@ void play_nim()
 		// handle user input and store request message onto the socket's output buffer (if such is created)
 		if(FD_ISSET(STDIN_FILENO, &read_set))
 		{
-			read_user_input();
+			handle_user_input();
 		}
 
 		// read from server socket and push onto input stack
@@ -219,17 +219,17 @@ void play_nim()
 		}
 
 		// see if we can write into the server's socket
-		if(FD_ISSET(sockfd, &write_set)
+		if(FD_ISSET(sockfd, &write_set))
 		{
 			// write from the output's buffer
-			num_bytes = send_partially(sockfd, buff_socket->output_buffer, buff_socket->output_buffer->size, &connection_closed);
+			num_bytes = send_partially(sockfd, (char*)(buff_socket->output_buffer), buff_socket->output_buffer->size, &connection_closed);
 			if(num_bytes < 0)
 			{
 				handle_send_error(connection_closed);
 			}
 
 			// pop num_bytes bytes from the buffer
-			pop(buff_socket->output_buffer, num_bytes);
+			pop_no_return(buff_socket->output_buffer, num_bytes);
 		}
 
 		/* see if have a server message that we can handle */
@@ -279,7 +279,7 @@ void handle_user_input()
 	}
 
 	char buffer[10];
-	if(scanf("%2s", &buffer) != 2)
+	if(scanf("%2s", buffer) != 2)
 	{
 		printf(USER_INPUT_ERR);
 		quit();
@@ -355,7 +355,7 @@ void handle_user_input()
 	create_client_to_client_message(&message, (char)client_id, destination_id, (char)count);
 
 	/* try to push it onto the socket output buffer to be sent later */
-	if(push(socket_buff->output_buffer, &message, sizeof(message) || push(socket_buff->output_buffer, buffer_msg, count))
+	if(push(buff_socket->output_buffer, (char*)(&message), sizeof(message)) || push(buff_socket->output_buffer, buffer_msg, count))
 	{
 		/* output buffer is full */
 		printf("Error: socket output buffer size limit reached\n");
@@ -397,7 +397,7 @@ int handle_server_message()
 	switch(message.message_type)
 	{
 	case HEAP_UPDATE_MSG:
-		handle_heaps_update((*heap_update_message)(&message));
+		handle_heaps_update((heap_update_message*)(&message));
 		break;
 	case CLIENT_TURN_MSG:
 		print_turn_message();
@@ -408,7 +408,7 @@ int handle_server_message()
 		print_message_acked(message.message_type);
 		break;
 	case MSG:
-		handle_player_message((*player_to_player_message)(&message));
+		handle_player_message((client_to_client_message*)(&message));
 		break;
 	case PROMOTION_MSG:
 		client_type = PLAYER; /* client is not playing */
@@ -467,7 +467,7 @@ void handle_heaps_update(heap_update_message* msg)
 
 	if(client_type == SPECTATOR)
 	{
-		print_game_over();
+		print_game_over_spectator();
 		quit();
 	}
 
@@ -484,7 +484,7 @@ void handle_heaps_update(heap_update_message* msg)
 	{
 		// gotta read it from the server
 
-		if(read_partially(sockfd, &winning_status, 1, &connection_closed))
+		if(recv_partially(sockfd, &winning_status, 1, &connection_closed))
 		{
 			handle_receive_error(connection_closed);
 		}
@@ -516,7 +516,7 @@ void handle_user_move(char heap)
 {
 
 	// calculate heap number to update (0 index is the left most)
-	char heap_num  = req - 'A';
+	char heap_num  = heap - 'A';
 	
 	// read number of items to remove
 	unsigned short items_to_remove;
@@ -549,7 +549,7 @@ void handle_user_move(char heap)
 
 	create_player_move_message(&msg, heap_num, items_to_remove);
 
-	if(push(socket_buff->output_buffer, &msg, sizeof(msg)))
+	if(push(buff_socket->output_buffer, (char*)(&msg), sizeof(msg)))
 	{
 		/* output buffer is full */
 		printf("Error: socket output buffer size limit reached\n");
@@ -591,11 +591,17 @@ void handle_openning_message()
 	
 	if(ret != SUCCESS)
 	{
-		handle_receive_error(ret, connection_closed);
+		if(ret == INVALID_MESSAGE_HEADER)
+		{
+			printf("Error: invalid format of received openning message\n");
+			quit();
+		}
+		/* network error or connection closed */
+		handle_receive_error(connection_closed);
 	}
 
 	// else, ret == SUCCESS
-	if(msg->connection_accepted == CONNECTION_DENIED)
+	if(msg.connection_accepted == CONNECTION_DENIED)
 	{
 		print_connection_refused();
 		quit();
@@ -604,16 +610,18 @@ void handle_openning_message()
 	// otherwise, connection accepted, process the message
 
 	// check if message is valid
-	if(valiadte_opening_message(msg))
+	if(valiadate_openning_message(&msg))
 	{
-		handle_receive_error(INVALID_MESSAGE_HEADER, 0);
+		printf("Error: invalid format of received openning message\n");
+		quit();
 	}
 	// get and set client type and id
 	client_type = msg.client_type;
 	client_id   = (unsigned char)msg.client_id;
 
 	// create a bufferd socket for buffering input and output to/from socket
-	buff_socket = create_buff_socket(sockfd);
+	// since the socket is a server, the type field is irrelevant
+	buff_socket = create_buff_socket(sockfd, 0);
 	if(buff_socket == NULL)
 	{
 		// malloc error
@@ -621,48 +629,18 @@ void handle_openning_message()
 	}
 
 	// print the openning message
-	proccess_openning_message(msg);
+	proccess_openning_message(&msg);
 
 }
 
 
-/**
 
-	simple methods to handle recieve/write errors or connection closure 
-**/
-
-void handle_receive_error(int return_code, int connection_closed)
-{
-
-
-	if(return_code == INVALID_MESSAGE_HEADER)
-	{
-		// not a connection error, but rather the server sent garbage message
-		// consider the connection closed
-		printf(INVALID_MSG_ERR);
-	}
-
-	else if(connection_closed)
-	{
-		/* other end was closed */
-		print_closed_connection();
-	}
-	else
-	{
-		/* some other recv error, use errno */
-		printf("%s: %s\n", RECV_ERROR, strerror(errno));
-	}
-
-	quit();
-
-}
 
 void handle_receive_error( int connection_closed)
 {
 
 
-	
-	 if(connection_closed)
+	if(connection_closed)
 	{
 		/* other end was closed */
 		print_closed_connection();
@@ -670,7 +648,7 @@ void handle_receive_error( int connection_closed)
 	else
 	{
 		/* some other recv error, use errno */
-		printf("%s: %s\n", RECV_ERROR, strerror(errno));
+		printf("%s: %s\n", RECV_ERR, strerror(errno));
 	}
 
 	quit();
@@ -701,7 +679,7 @@ void handle_send_error( int connection_closed)
 	else
 	{
 		/* some other send error, use errno */
-		printf("%s: %s\n", SEND_ERROR, strerror(errno));
+		printf("%s: %s\n", SEND_ERR, strerror(errno));
 	}
 
 	quit();

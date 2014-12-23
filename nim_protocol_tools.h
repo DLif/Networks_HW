@@ -210,4 +210,96 @@ int valiadate_message(message_container* msg);
 #define CONNECTION_ERROR       2
 #define SUCCESS                0
 
+
+
+/**
+	This method initializes a new openning message to the client
+	use this method when the server accepts a client [CONNECTION_ACCEPTED will be used ]
+	parameters:
+		1. message - reference to the buffer struct to initialize
+		2. isMisere: either MISERE or REGULAR [1 or 0 respectively]
+		3. p - number of active players ( NOT number of active clients )
+		4. client_id - id of new client, should be <= 24 at all times
+		5. client_type: either SPECTATOR or PLAYER
+**/
+
+void create_openning_message(openning_message* message, char isMisere, char p, char client_id, char client_type);
+
+
+/** 
+	this method should be used to initialize the struct when the server does not accept the connection
+**/
+
+void create_openning_message_negative(openning_message* message);
+
+
+/*
+	method initializes a new heap update message, that the server sends to the clients
+	params:
+		1. message - the struct buffer, struct to initalize
+		2. heaps   - array of NUM_HEAPS heaps
+		3. game_over - either GAME_CONTINUES or GAME_OVER
+*/
+
+void create_heap_update_message(heap_update_message* message, short* heaps, char game_over);
+
+/*
+	method initializes a new client turn message - a message that the server sends to a specific player client
+	in order to notify him that it is his turn
+*/
+
+void create_client_turn_message(client_turn_message* message);
+
+
+
+/*
+	these two methods initializes messages that represent:
+		1. an ACK to the last move message sent by the user
+		2. a negative ACK that the last move sent by the user was illegal
+	repectively.
+*/
+
+void create_ack_move_message(ack_move_message* message);
+
+void create_illegal_move_message(illegal_move_message* message);
+
+
+/**
+	method initializes a new player to player message
+	params:
+		sender_id - id of sender client
+		destination_id - id of destination client
+		length -  size of the message in bytes <= MAX_MSG_SIZE (and positive)
+**/
+
+
+void create_client_to_client_message(client_to_client_message* message, char sender_id, char destination_id, char length);
+
+
+
+/*
+	method initializes a promotion message, i.e. a message that a server sends to a spectator if he wishes to promote him to a player
+*/
+
+
+void create_promotion_message(promotion_msg* message);
+
+
+
+/**
+	method initializes a new message that a player sends to the server if he wishes to make a move
+	params:
+		heap_index - index of heap that we wish to remove item from [0-3]
+		amount_to_remove - amount to remove, should be a positive value <= MAX_HEAP_SIZE
+
+**/
+
+
+void create_player_move_message(player_move_msg* message, char heap_index, short amount_to_remove);
+
+
+
+
+
+
 #endif

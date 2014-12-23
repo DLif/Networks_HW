@@ -5,13 +5,15 @@
 /* 
 	this method allocates a new buffered socket
 	handles and prints errors
+	
+	type - in case of a client, should hold client type (SPECTATOR or CLIENT)
 
 	if a malloc error occured, frees resources, prints error and returns NULL
 	else, the allocated object is returned 
 
 */
 
-buffered_socket* create_buff_socket(int sockfd)
+buffered_socket* create_buff_socket(int sockfd, int type)
 {
 	buffered_socket* res = (buffered_socket*)malloc(sizeof(buffered_socket));
 	if( res == NULL)
@@ -38,6 +40,9 @@ buffered_socket* create_buff_socket(int sockfd)
 		return NULL;
 	}
 
+
+	res->client_stat = type;
+	res->next_client = NULL;
 	return res;
 
 }
@@ -53,6 +58,8 @@ void free_buff_socket(buffered_socket* sock)
 	free(sock->output_buffer);
 	free(sock);
 }
+
+
 
 
 

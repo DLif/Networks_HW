@@ -1,5 +1,6 @@
 #include "IO_buffer.h"
 
+
 /*
 	method pushes num_bytes from source_buffer to given io_buffer struct
 	returns OVERFLOW_ERROR if buffer cannot push num_bytes (positive value)
@@ -66,12 +67,15 @@ int pop(io_buffer* buff, char* target_buffer, int num_bytes)
 }
 
 /*
-	this method pops the first num_bytes from the buffer
+	this method pops num_bytes from buff struct (circular buffer)
 	the method returns 1 on error (num_bytes too big)
 
 	or 0 on success
 */
-int pop(io_buffer* buff, int num_bytes){
+
+int pop_no_return(io_buffer* buff, int num_bytes)
+{
+
 	if(num_bytes > buff->size)
 		return 1;
 
@@ -79,7 +83,8 @@ int pop(io_buffer* buff, int num_bytes){
 	buff->head = (buff->head + num_bytes) % MAX_IO_BUFFER_SIZE;
 	buff->size -= num_bytes;
 
-	return 0;	
+	return 0;
+
 }
 
 
@@ -127,14 +132,14 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 	{
 		if(message_type == MSG) /* client to client message */
 		{
-			client_to_client_message *msg = (client_to_client_message*)((buff->buffer));
+			client_to_client_message* msg = (client_to_client_message*)(buff->buffer);
 
 			/* we also need to check that the actual message is on the buffer */
-			if((buff->size) >= (message_size + (msg->length)))
+			if(buff->size >= message_size + msg->length)
 			{
 				// the actual message is in the buffer
 				// pop the header and store it in msg_container
-				pop(buff, (char*)(msg_container), message_size);
+				pop(buff, (char*)msg_container, message_size);
 				if(valiadate_message(msg_container))
 				{
 					return INVALID_MESSAGE;
@@ -153,7 +158,7 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 		else
 		{
 			// pop the message 
-			pop(buff, (char*)(msg_container), message_size);
+			pop(buff, (char*)msg_container, message_size);
 			if(valiadate_message(msg_container))
 			{
 				return INVALID_MESSAGE;

@@ -94,7 +94,7 @@ void print_client_type(char client_type)
 
 #define GAME_OVER_MSG "Game over!"
 
-void print_game_over()
+void print_game_over_spectator()
 {
 	printf(GAME_OVER_MSG);
 }
@@ -104,7 +104,7 @@ void print_game_over()
 
 void print_game_over(int win_status)
 {
-	if(winner == WIN)
+	if(win_status == WIN)
 		printf(CLIENT_WON_STR);
 	else
 		printf(CLIENT_LOST_STR);

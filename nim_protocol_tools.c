@@ -26,7 +26,7 @@ void create_openning_message(openning_message* message, char isMisere, char p, c
 	this method should be used to initialize the struct when the server does not accept the connection
 **/
 
-void create_openning_message(openning_message* message)
+void create_openning_message_negative(openning_message* message)
 {
 	message->connection_accepted = CONNECTION_DENIED;
 	/* ignore the rest */
@@ -124,7 +124,7 @@ void create_player_move_message(player_move_msg* message, char heap_index, short
 {
 	message->message_type = PLAYER_MOVE_MSG;
 	message->heap_index = heap_index;
-	message->amount_to_remove = amount_to_remove
+	message->amount_to_remove = amount_to_remove;
 
 }
 
@@ -144,15 +144,15 @@ int get_message_size(int message_type)
 	switch(message_type)
 	{
 	case HEAP_UPDATE_MSG:
-		return sizeof(heap_update_msg);
+		return sizeof(heap_update_message);
 	case CLIENT_TURN_MSG:
-		return sizeof(client_turn_msg);
+		return sizeof(client_turn_message);
 	case ACK_MOVE_MSG:
-		return sizeof(ack_move_msg);
+		return sizeof(ack_move_message);
 	case ILLEGAL_MOVE_MSG:
-		return sizeof(illegal_move_msg);
+		return sizeof(illegal_move_message);
 	case MSG:
-		return sizeof(client_to_client_msg);
+		return sizeof(client_to_client_message);
 	case PROMOTION_MSG:
 		return sizeof(promotion_msg);
 	case PLAYER_MOVE_MSG:
@@ -228,22 +228,24 @@ int read_openning_message(int sockfd, openning_message* msg, int* connection_clo
 int valiadate_message(message_container* msg)
 {
 
-	switch(message_type)
+	switch(msg->message_type)
 	{
 	case HEAP_UPDATE_MSG:
-		heap_update_message* temp = (heap_update_message*)msg;
-		if (temp->game_over != GAME_OVER && temp->game_over != GAME_CONTINUES)
-			return 1;
-		int i;
-		for(i = 0; i < NUM_HEAPS; ++i)
 		{
-			// check if heap values are valid 
-			if((unsigned short)(temp->heaps[i]) > MAX_HEAP_SIZE)
+			heap_update_message* temp = (heap_update_message*)msg;
+			if (temp->game_over != GAME_OVER && temp->game_over != GAME_CONTINUES)
 				return 1;
+			int i;
+			for(i = 0; i < NUM_HEAPS; ++i)
+			{
+				// check if heap values are valid 
+				if((unsigned short)(temp->heaps[i]) > MAX_HEAP_SIZE)
+					return 1;
+			}
+			return 0;
 		}
 
-
-		return 0;
+		
 			
 	case CLIENT_TURN_MSG:
 		/* nothing to check */
@@ -255,32 +257,36 @@ int valiadate_message(message_container* msg)
 		/* nothing to check */
 		return 0;
 	case MSG:
+		{
+			client_to_client_message* temp = (client_to_client_message*)msg;
+			/* checks of ids should be done in the server, since it decides the valid ids */
+
+			/* check if length is valid */
+			if((unsigned char)(temp->length) > MAX_MSG_SIZE)
+				return 1;
 		
-		client_to_client_message* temp = (client_to_client_message*)msg;
-		/* checks of ids should be done in the server, since it decides the valid ids */
-
-		/* check if length is valid */
-		if((unsigned char)(temp->length) > MAX_MSG_SIZE)
-			return 1;
-
-		return 0;
+			return 0;
+		}
 	case PROMOTION_MSG:
 		/* nothing to check */
 		return 0;
 	case PLAYER_MOVE_MSG:
-		
-		player_move_msg* temp = (player_move_msg*)msg;
-		/* check number of heaps */
-		if((unsigned char)(temp->heap_index) >= NUM_HEAPS)
-			return 1;
-
-		/* check amount to remove */
-		if((unsigned short)(temp->amount_to_remove) > MAX_HEAP_SIZE)
 		{
-			return 1;
-		}
+		
+			player_move_msg* temp = (player_move_msg*)msg;
+			/* check number of heaps */
+			if((unsigned char)(temp->heap_index) >= NUM_HEAPS)
+				return 1;
 
-		return 0;
+			/* check amount to remove */
+			if((unsigned short)(temp->amount_to_remove) > MAX_HEAP_SIZE)
+			{
+				return 1;
+			}
+
+			return 0;
+
+		}
 
 	default:
 		return -1;     /* error */
