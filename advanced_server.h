@@ -18,11 +18,11 @@
 #include "IO_buffer.h"
 #include "nim_game.h"
 #include "socket_IO_tools.h"
+#include "client_list.h"
 
 #define NETWORK_FUNC_FAILURE -1 /* error code */
 #define END_GAME 1
-#define AWATING_CLIENTS_NUM   10 /* connection queue size+ 1 to send "not able to connect"*/
-#define MAX_CLIENT_NUM 25
+#define MAX_CLIENTS   9
 
 
 #define __DEBUG__
@@ -43,6 +43,8 @@ void init_clients_array();
 
 int calc_next_player(int prev_player);
 
+buffered_socket* get_buffered_socket_by_id(int req_id);
+
 int chat_message_handle(int sender,message_container *abs_message);
 
 int game_message_handle(int curr_to_play,int curr_user,message_container** message_container_p,player_move_msg** game_move_p);
@@ -62,3 +64,9 @@ void setReadSet(fd_set* read_set,int listeningSoc);
 void setWriteSet(fd_set* write_set);
 
 int findMax(int listeningSoc);
+
+int send_msg_affter_endGame();
+
+void calc_min_by_new_free(int new_free);
+
+void calc_new_min_by_occupy();
