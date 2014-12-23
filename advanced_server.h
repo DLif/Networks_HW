@@ -70,3 +70,5 @@ int send_msg_affter_endGame();
 void calc_min_by_new_free(int new_free);
 
 void calc_new_min_by_occupy();
+
+bool checkServerArgsValidity(int argc,const char* argv[]);

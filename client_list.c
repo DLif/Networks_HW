@@ -20,9 +20,10 @@ void add_client(client_list* list, buffered_socket* node)
 	list->size += 1;
 
 	// in case of an empty list
-	if(list->size == 0)
+	if(list->size == 1)
 	{
-		list->first = list->last = node;
+		list->first = node;
+		list->last = node;
 		return;
 
 	}

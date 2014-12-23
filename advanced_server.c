@@ -9,7 +9,29 @@ int min_free_num =0;
 int main( int argc, const char* argv[] ){
 	short port = 6325;	//set the port to default
 	int listeningSoc; //listening socket on port 
+	short M;			//initial heaps size
+	bool input_isMisere;//initial the kind of game(if the last one to finish the last heap is the winner or the loser)
 	struct buffered_socket *running = NULL;
+
+	//check the validity of the argument given by the user.
+	if (!checkServerArgsValidity(argc ,argv)){
+		printf("Error: invalid arguments given to server\n");
+		return 0;
+	}
+
+	// read the input from command line
+	max_players_game= atoi(argv[1]);
+	M = (short)atoi(argv[2]);
+	if (atoi(argv[3]) == 0)	
+		input_isMisere = false;
+	else 
+		input_isMisere = true;
+	// check optional port argument
+	if (argc == 5) 
+		port = (short)atoi(argv[4]);
+
+	//init game
+	init_game(input_isMisere, M);
 
 	//init the server listening socket
 	listeningSoc = initServer(port);
@@ -103,7 +125,6 @@ int get_new_connections(int listeningSoc){
 	openning_message first_msg;
 
 	//accept the connection from the client
-	printf("get_new_connections\n");
 	toClientSocket = accept(listeningSoc,(struct sockaddr*) &clientAdderInfo,&addressSize);
 	if(toClientSocket < 0)
 	{
@@ -111,8 +132,7 @@ int get_new_connections(int listeningSoc){
 		close(listeningSoc);
 		return NETWORK_FUNC_FAILURE;
 	}
-	
-	if (clients_linked_list.last->client_id >= MAX_CLIENTS)
+	if (clients_linked_list.last != NULL && clients_linked_list.last->client_id >= MAX_CLIENTS)
 	{
 		int is_connection_closed = 0;
 		//assume working and write ready
@@ -139,15 +159,17 @@ int get_new_connections(int listeningSoc){
 		}
 	}
 	else if(num_exsisting_players >= max_players_game){
-		buffered_socket *new_client_struct = create_buff_socket(toClientSocket,min_free_num,SPECTATOR);
-		add_client(&clients_linked_list,new_client_struct);
+		printf("new SPECTATOR number %d\n", min_free_num);
+		new_client = create_buff_socket(toClientSocket,min_free_num,SPECTATOR);
+		add_client(&clients_linked_list,new_client);
 	}
 	else{
-		buffered_socket *new_client_struct = create_buff_socket(toClientSocket,min_free_num,PLAYER);
-		add_client(&clients_linked_list,new_client_struct);
+		
+		new_client = create_buff_socket(toClientSocket,min_free_num,PLAYER);
+		printf("new PLAYER number %d\n",min_free_num);
+		add_client(&clients_linked_list,new_client);
 		num_exsisting_players++;
 	}
-
 
 	//send first message- for first byte assume write ready
 	create_openning_message(&first_msg,IsMisere,num_exsisting_players,min_free_num,new_client->client_stat);
@@ -159,7 +181,6 @@ int get_new_connections(int listeningSoc){
 	}
 
 	calc_new_min_by_occupy();// update min_free_num
-
 	return 0;
 }
 
@@ -692,4 +713,62 @@ void calc_new_min_by_occupy(){
 			return;
 		}
 	}
+}
+
+/*  
+	this method checks whether the given arguments given in command line are valid
+	returns true if are valid, returns false otherwise
+*/ 
+#define MAX_HEAP_SIZE  1500
+bool checkServerArgsValidity(int argc,const char* argv[]){
+
+	// check if the number of arguments is valid
+	if(argc > 5 || argc < 4) return false;
+
+	errno = 0;
+	//check p parameter
+
+	long p = strtol(argv[2], NULL, 10);
+	if((p == LONG_MIN || p == LONG_MAX) && errno != 0)
+		// overflow or underflow
+		return false;
+	if( p == 0 )
+		return false;
+	
+	if (p < 1 || p > MAX_CLIENTS) 
+		return false;
+
+	// check stack size paramater
+	// try to convert the given number to a long
+	long stack_size = strtol(argv[2], NULL, 10);
+	
+	if((stack_size == LONG_MIN || stack_size == LONG_MAX) && errno != 0)
+		// overflow or underflow
+		return false;
+	if( stack_size == 0 )
+		return false;
+	
+	if (stack_size < 1 || stack_size > MAX_HEAP_SIZE) 
+		return false;
+
+	// check isMisere paramter
+	if (argv[3][0] != '0' && argv[3][0] != '1') 
+		return false;
+	if (strlen(argv[2]) > 1)
+		return false;
+	if(argc == 5)
+	{
+		// check port number
+		errno = 0;
+		long port = strtol(argv[3], NULL, 10);
+		
+		if((port == LONG_MIN || port == LONG_MAX) && errno != 0)
+			return false;
+		if(port == 0 && errno != 0)
+			return false;
+		if(port < 0 || port > USHRT_MAX)
+			// value cant be a port number
+			return false;
+	}
+	return true;
 }
