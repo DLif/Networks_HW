@@ -503,20 +503,15 @@ int send_info(fd_set* write_set){
 
 		cur_socket = clients_array[i]->sockfd;
 		if (FD_ISSET(cur_socket,write_set)){
-			//get message
-			error = pop_message(clients_array[i]->output_buffer,&input_msg){
-				printf("Error pop_message from socket of client number %d in send_info\n",i );
-				return NETWORK_FUNC_FAILURE;
-			}
-			//try to send it
-			resvied_size = send(cur_socket,(char*)(&input_msg),sizeof(message_container),0);
+			//try to send all the buffer
+			resvied_size = send(cur_socket,(char*)(clients_array[i]->output_buffer),clients_array[i]->output_buffer->size,0);
 			if (resvied_size < 0)
 			{
 				printf("Error sending to socket of client number %d\n",i );
 				return NETWORK_FUNC_FAILURE;
 			}
-			//push the rest of what we didn't manage to sent
-			error = push(clients_array[i]->output_buffer,((char*)(&input_msg))+resvied_size,sizeof(message_container)-resvied_size);
+			//pop all the information we was able to send
+			error = pop(clients_array[i]->output_buffer,resvied_size);
 			if (error == NETWORK_FUNC_FAILURE)
 			{
 				printf("Error pushing to output buffer the unsent part of client number %d\n in send_info",i );

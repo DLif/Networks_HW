@@ -60,5 +60,14 @@ int pop(io_buffer* buff, char* target_buffer, int num_bytes);
 
 int pop_message(io_buffer* buff, message_container* msg_container);
 
+/*
+	this method pops the first num_bytes from the buffer
+	the method returns 1 on error (num_bytes too big)
+
+	or 0 on success
+*/
+
+int pop(io_buffer* buff, int num_bytes);
+
 int valiadate_message(message_container* msg_container);
 #endif

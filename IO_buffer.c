@@ -65,6 +65,23 @@ int pop(io_buffer* buff, char* target_buffer, int num_bytes)
 
 }
 
+/*
+	this method pops the first num_bytes from the buffer
+	the method returns 1 on error (num_bytes too big)
+
+	or 0 on success
+*/
+int pop(io_buffer* buff, int num_bytes){
+	if(num_bytes > buff->size)
+		return 1;
+
+	// update invariants
+	buff->head = (buff->head + num_bytes) % MAX_IO_BUFFER_SIZE;
+	buff->size -= num_bytes;
+
+	return 0;	
+}
+
 
 
 /*
