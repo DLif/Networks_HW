@@ -9,11 +9,9 @@
 	if a malloc error occured, frees resources, prints error and returns NULL
 	else, the allocated object is returned 
 
-	client_new_stat tells as is the cilent PLAYER, SPECTATOR
-
 */
 
-buffered_socket* create_buff_socket(int sockfd,int client_new_stat)
+buffered_socket* create_buff_socket(int sockfd)
 {
 	buffered_socket* res = (buffered_socket*)malloc(sizeof(buffered_socket));
 	if( res == NULL)
@@ -23,7 +21,6 @@ buffered_socket* create_buff_socket(int sockfd,int client_new_stat)
 	}
 
 	res->sockfd = sockfd;
-	res->client_stat=client_new_stat;
 	res->input_buffer = (io_buffer*)malloc(sizeof(io_buffer));
 	if(res->input_buffer == NULL)
 	{

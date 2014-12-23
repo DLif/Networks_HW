@@ -3,10 +3,6 @@
 #include <malloc.h>
 #include <stdio.h>
 
-
-#define PLAYER 1
-#define SPECTATOR 0
-
 /* 
    this struct represents a buffered socket
    each socket has an input and output buffer
@@ -16,7 +12,6 @@
 typedef struct buffered_socket
 {
 	int sockfd; 
-	int client_stat;
 	io_buffer* input_buffer;
 	io_buffer* output_buffer;
 
@@ -31,7 +26,7 @@ typedef struct buffered_socket
 
 */
 
-buffered_socket* create_buff_socket(int sockfd,int client_new_stat);
+buffered_socket* create_buff_socket(int sockfd);
 
 
 /*
