@@ -56,9 +56,9 @@ int server_loop(int listeningSoc){
 		fd_max = findMax(listeningSoc);
 
 		error = select(fd_max+1,&read_set,&write_set,NULL,NULL);
-		if (error == NETWORK_FUNC_FAILURE)
+		if (error < 0)
 		{
-			printf("error in select ");
+			printf("Error: select method failed: %s\n", strerror(errno));
 			return NETWORK_FUNC_FAILURE;
 		}
 
@@ -81,7 +81,7 @@ int server_loop(int listeningSoc){
 				error = send_info(&write_set); 
 				if (error == NETWORK_FUNC_FAILURE)
 				{
-					printf("Errors in sending after game end");
+					printf("Error: failed to send final messages to the client, when the game ended\n");
 					return NETWORK_FUNC_FAILURE;
 				}
 			}
@@ -91,19 +91,19 @@ int server_loop(int listeningSoc){
 			continue;
 		}
 
-		//check if there is a new requests to connect - and add it
+		//check if there are new requests to connect - and add it
 		if (FD_ISSET(listeningSoc,&read_set))
 		{
 			game_stat = get_new_connections(listeningSoc);
 			if (game_stat == NETWORK_FUNC_FAILURE)
 			{
-				printf("Error making new connection");
+				printf("Error: could not accept new connection: %s", strerror(errno));
 				return NETWORK_FUNC_FAILURE;
 			}
 		}
 
 		//get all client input and handle it
-		game_stat =handle_reading_writing(&read_set,&write_set,&prev_client_to_move);
+		game_stat = handle_reading_writing(&read_set,&write_set,&prev_client_to_move);
 		if (game_stat == NETWORK_FUNC_FAILURE)
 		{
 			printf("Error in handle_reading_writing function");
@@ -111,7 +111,9 @@ int server_loop(int listeningSoc){
 		}
 		else if (game_stat == END_GAME)
 		{
-			printf("The game has ended. Existing peacefully");
+#ifdef __DEBUG__
+			printf("The game has ended. Exiting peacefully");
+#endif
 		}
 	}
 	//should never get here
