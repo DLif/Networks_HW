@@ -225,7 +225,7 @@ void play_nim()
 		if(FD_ISSET(sockfd, &write_set))
 		{
 			// write from the output's buffer
-			num_bytes = send_partially(sockfd, (char*)(buff_socket->output_buffer), buff_socket->output_buffer->size, &connection_closed);
+			num_bytes = send_partially(sockfd, (char*)(buff_socket->output_buffer->buffer), buff_socket->output_buffer->size, &connection_closed);
 			if(num_bytes < 0)
 			{
 				handle_send_error(connection_closed);
