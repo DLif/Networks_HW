@@ -215,6 +215,9 @@ void play_nim()
 				printf("Error: client input buffer size limit reached\n");
 				quit();
 			}
+
+                        /* see if have a server message that we can handle */
+		        handle_server_message();
 				
 		}
 
@@ -231,9 +234,6 @@ void play_nim()
 			// pop num_bytes bytes from the buffer
 			pop_no_return(buff_socket->output_buffer, num_bytes);
 		}
-
-		/* see if have a server message that we can handle */
-		handle_server_message();
 
 	}
 	
