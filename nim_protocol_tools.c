@@ -1,5 +1,6 @@
 #include "nim_protocol_tools.h"
 #include "socket_IO_tools.h"
+#include <stdio.h>
 
 /**
 	This method initializes a new openning message to the client
@@ -190,7 +191,11 @@ int read_openning_message(int sockfd, openning_message* msg, int* connection_clo
 		/* error occured */
 		return CONNECTION_ERROR;
 	}
-	
+	printf("msg->connection_accepted :%d\n", msg->connection_accepted);
+	printf("msg->isMisere :%d\n", msg->isMisere);
+	printf("msg->p :%d\n", msg->p);
+	printf("msg->client_id :%d\n", msg->client_id);
+	printf("msg->client_type :%d\n", msg->client_type);
 	if(msg->connection_accepted == CONNECTION_DENIED)
 	{
 		/* we have read the single byte */

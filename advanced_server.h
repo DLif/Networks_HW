@@ -35,7 +35,7 @@ int server_loop(int listeningSoc);
 
 int get_new_connections(int listeningSoc);
 
-int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *prev_client_to_move);
+int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *curr_to_play,bool *first_move);
 
 int initServer(short port);
 
@@ -72,3 +72,5 @@ void calc_min_by_new_free(int new_free);
 void calc_new_min_by_occupy();
 
 bool checkServerArgsValidity(int argc,const char* argv[]);
+
+int send_your_move(int next_player);

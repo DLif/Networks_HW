@@ -65,9 +65,9 @@ int server_loop(int listeningSoc){
 	//game_stat will report errors or end game
 	int game_stat = GAME_CONTINUES;
 	int error =0;
+	bool first_move = true;
 
 	while(1){
-		printf("server_loop enter\n");
 		//prepare for select
 		setReadSet(&read_set,listeningSoc);
 		setWriteSet(&write_set);
@@ -93,7 +93,7 @@ int server_loop(int listeningSoc){
 		}
 
 		//get all client input and handle it
-		game_stat =handle_reading_writing(&read_set,&write_set,&next_to_move);
+		game_stat =handle_reading_writing(&read_set,&write_set,&next_to_move,&first_move);
 		if (game_stat == NETWORK_FUNC_FAILURE)
 		{
 			printf("Error in handle_reading_writing function");
@@ -160,12 +160,12 @@ int get_new_connections(int listeningSoc){
 	}
 	else if(num_exsisting_players >= max_players_game){
 		printf("new SPECTATOR number %d\n", min_free_num);
-		new_client = create_buff_socket(toClientSocket,min_free_num,SPECTATOR);
+		new_client = create_buff_socket(toClientSocket,SPECTATOR,min_free_num);
 		add_client(&clients_linked_list,new_client);
 	}
 	else{
 		
-		new_client = create_buff_socket(toClientSocket,min_free_num,PLAYER);
+		new_client = create_buff_socket(toClientSocket,PLAYER,min_free_num);
 		printf("new PLAYER number %d\n",min_free_num);
 		add_client(&clients_linked_list,new_client);
 		num_exsisting_players++;
@@ -173,19 +173,20 @@ int get_new_connections(int listeningSoc){
 
 	//send first message- for first byte assume write ready
 	create_openning_message(&first_msg,IsMisere,num_exsisting_players,min_free_num,new_client->client_stat);
-	error = push(new_client->output_buffer,(char*)(&first_msg),sizeof(client_turn_message));
+	//printf("%d\n",(((char*)(&first_msg))[0]) );
+	error = push(new_client->output_buffer,(char*)(&first_msg),sizeof(openning_message));
 	if (error == NETWORK_FUNC_FAILURE)
 	{
 		printf("unable to push first message to client %d\n",min_free_num);
 		return NETWORK_FUNC_FAILURE;
 	}
-
+	printf("new_client->output_buffer->size %d\n",new_client->output_buffer->size );
 	calc_new_min_by_occupy();// update min_free_num
 	return 0;
 }
 
 //handle all input and output to clients (all the game actually)
-int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *curr_to_play){
+int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *curr_to_play,bool *first_move){
 	buffered_socket *running = NULL;
 	//error indicator
 	int error = 0;
@@ -224,11 +225,12 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *curr_to_play)
 	for(running=clients_linked_list.first;running != NULL;running=running->next_client)
 	{
 		pop_stat = pop_message(running->input_buffer,abs_message);
-		if (pop_stat == MSG_NOT_COMPLETE) continue;
+		//PROBLEM 1- if running->input_buffer->size  == 0 return INVALID_MESSAGE and not MSG_NOT_COMPLETE
+		if (pop_stat == MSG_NOT_COMPLETE) {continue;}
 		else if (pop_stat == INVALID_MESSAGE)
 		{
 			//undefined message
-			printf("Errors in reading from input buffers - buffer of client %d",running->client_id);
+			printf("Errors in reading from input buffers - buffer of client %d\n",running->client_id);
 			return NETWORK_FUNC_FAILURE;
 		}
 		else { //must be pop_stat == SUCCESS
@@ -245,6 +247,8 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *curr_to_play)
 			}
 		}
 	}
+	//we got all the messages and handled them (exsept for the game). abs_message no longer needed
+	free(abs_message);
 
 	if (game_move != NULL)
 	{
@@ -292,6 +296,24 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *curr_to_play)
 
 		//updated next client to move only when a move was done to move  
 		*curr_to_play = calc_next_player(*curr_to_play);
+		//TODO : send to the next player- "you should play"
+		error = send_your_move(*curr_to_play);
+		if (error == NETWORK_FUNC_FAILURE)
+		{
+			printf("error in sending heaps messages\n");
+			return NETWORK_FUNC_FAILURE;
+		}
+	}
+	else if (*first_move)
+	{
+		error = send_your_move(*curr_to_play);
+		if (error == NETWORK_FUNC_FAILURE)
+		{
+			printf("error in sending heaps messages\n");
+			return NETWORK_FUNC_FAILURE;
+		}
+
+		*first_move = false;
 	}
 
 	return GAME_CONTINUES;
@@ -565,7 +587,7 @@ int send_info(fd_set* write_set){
 		if (FD_ISSET(cur_socket,write_set)){
 			int is_connection_closed =0 ;
 			//try to send all the buffer
-			resvied_size = send_partially(cur_socket,(char*)(running->output_buffer),running->output_buffer->size,&is_connection_closed);
+			resvied_size = send_partially(cur_socket,(char*)(running->output_buffer->buffer),running->output_buffer->size,&is_connection_closed);
 			if (resvied_size < 0)
 			{
 				printf("Error sending to socket of client number %d\n",running->client_id  );
@@ -574,8 +596,13 @@ int send_info(fd_set* write_set){
 			if (is_connection_closed == 1)
 			{
 				running_next = running->next_client;
+				printf("quiting client\n");
 				quit_client_handle(running->client_id);
 				running = running_next;
+			}
+			if (resvied_size >0 )
+			{
+				printf("to client %d sent %d bytes\n", running->client_id,resvied_size);
 			}
 			//pop all the information we was able to send
 			error =pop_no_return(running->output_buffer,resvied_size);
@@ -771,4 +798,21 @@ bool checkServerArgsValidity(int argc,const char* argv[]){
 			return false;
 	}
 	return true;
+}
+
+int send_your_move(int next_player){
+	int error =0;
+	printf("send your_turn_move to client %d\n",next_player);
+	client_turn_message your_turn_move;
+	//fill send buff
+	create_client_turn_message(&your_turn_move);
+	//push message
+	error = push(get_buffered_socket_by_id(next_player)->output_buffer,(char*)(&your_turn_move),sizeof(client_turn_message));
+	if (error == OVERFLOW_ERROR)
+	{
+		printf("can't push client_turn_message to %d\n",next_player);
+		return NETWORK_FUNC_FAILURE;
+	}
+	printf("end send_your_move\n");
+	return 0;
 }

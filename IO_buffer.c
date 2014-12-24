@@ -1,4 +1,5 @@
 #include "IO_buffer.h"
+#include <stdio.h>
 
 
 /*
@@ -18,12 +19,14 @@ int push(io_buffer* buff, char* source_buffer, int num_bytes)
 	}
 
 	int i;
-	int start_index = (buff->tail + 1) % MAX_IO_BUFFER_SIZE;
+	int start_index = (buff->tail) % MAX_IO_BUFFER_SIZE;//was buff->tail+1
 	
+	printf("%d \n", start_index);
 	// push data to buffer
 
 	for( i = 0; i < num_bytes; ++i)
 	{
+		printf("source_buffer %d : %d\n",i, source_buffer[i]);
 		buff->buffer[(start_index + i) % MAX_IO_BUFFER_SIZE] = source_buffer[i];
 	}
 
@@ -108,6 +111,12 @@ int pop_no_return(io_buffer* buff, int num_bytes)
 
 int pop_message(io_buffer* buff, message_container* msg_container)
 {
+	//if buffer empty, can;t pop message(no message exsist).
+	if (buff->size == 0)
+	{
+		//no messages in buffer
+		return MSG_NOT_COMPLETE;
+	}
 	/* read the first byte first, that defines the type of the message */
 	/* the first byte is is at index head                              */
 	char message_type = buff->buffer[buff->head];
