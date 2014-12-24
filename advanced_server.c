@@ -180,7 +180,6 @@ int get_new_connections(int listeningSoc){
 		printf("unable to push first message to client %d\n",min_free_num);
 		return NETWORK_FUNC_FAILURE;
 	}
-	printf("new_client->output_buffer->size %d\n",new_client->output_buffer->size );
 	calc_new_min_by_occupy();// update min_free_num
 	return 0;
 }
@@ -253,12 +252,14 @@ int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *curr_to_play,
 	if (game_move != NULL)
 	{
 		//handle game
+		printf("client made turn\n");
 		round_reasult = makeRound(game_move->heap_index,game_move->amount_to_remove,&is_leagel_move);
 		free(game_move);
 		
 
 		if (round_reasult == NONE)//the game continue
 		{
+			printf("game continue after move\n");
 			error = send_move_leagelness(*curr_to_play,is_leagel_move);
 
 			if (error == NETWORK_FUNC_FAILURE)
@@ -492,6 +493,7 @@ int send_heap_mss_to_all(int is_victory){
 	buffered_socket *running = NULL;
 	int error =0;
 
+	printf("send heaps to all\n");
 	heap_update_message heap_mes;
 	create_heap_update_message(&heap_mes,heaps_array,is_victory);
 	for(running=clients_linked_list.first;running != NULL;running=running->next_client)
@@ -542,14 +544,14 @@ int read_to_buffs(fd_set* read_set){
 	buffered_socket *running_next = NULL;
 	int error = 0;
 	int cur_socket = -1;//the socket we are currently pulling info from recive
-	message_container input_msg;
+	char *recv_buff =(char*)malloc(MAX_IO_BUFFER_SIZE);
 	int resvied_size =0;
 
 	for(running=clients_linked_list.first;running != NULL;)
 	{
 		cur_socket = running->sockfd;
 		if (FD_ISSET(cur_socket,read_set)){
-			resvied_size = recv(cur_socket,(char*)(&input_msg),sizeof(message_container),0);
+			resvied_size = recv(cur_socket,recv_buff,MAX_IO_BUFFER_SIZE,0);
 			if (resvied_size < 0)
 			{
 				printf("Error reading from socket of client number %d\n",running->client_id );
@@ -561,7 +563,7 @@ int read_to_buffs(fd_set* read_set){
 				quit_client_handle(running->client_id);
 				running = running_next;
 			}
-			error = push(running->input_buffer,(char*)(&input_msg),resvied_size);
+			error = push(running->input_buffer,recv_buff,resvied_size);
 			if (error == NETWORK_FUNC_FAILURE)
 			{
 				printf("Error pushing to input buffer of client number %d\n in read_to_buffs",running->client_id );
@@ -571,6 +573,7 @@ int read_to_buffs(fd_set* read_set){
 		//advance loop
 		running=running->next_client;
 	}
+	free(recv_buff);
 	return 0;
 }
 
@@ -581,13 +584,14 @@ int send_info(fd_set* write_set){
 	int cur_socket = -1;//the socket we are currently pulling info from recive
 	int resvied_size =0;
 
+
 	for(running=clients_linked_list.first;running != NULL;)
 	{
 		cur_socket = running->sockfd;
 		if (FD_ISSET(cur_socket,write_set)){
 			int is_connection_closed =0 ;
 			//try to send all the buffer
-			resvied_size = send_partially(cur_socket,(char*)(running->output_buffer->buffer),running->output_buffer->size,&is_connection_closed);
+			resvied_size = send_partially(cur_socket,(char*)running->output_buffer->buffer,running->output_buffer->size,&is_connection_closed);
 			if (resvied_size < 0)
 			{
 				printf("Error sending to socket of client number %d\n",running->client_id  );
@@ -603,10 +607,16 @@ int send_info(fd_set* write_set){
 			if (resvied_size >0 )
 			{
 				printf("to client %d sent %d bytes\n", running->client_id,resvied_size);
+				/*printf("the buffer:\n");
+				for (int i = 0; i < resvied_size; ++i)
+				{
+					printf("%d\n",((char*)running->output_buffer->buffer)[i] );
+				}
+				printf("\n");*/
 			}
 			//pop all the information we was able to send
 			error =pop_no_return(running->output_buffer,resvied_size);
-			if (error == NETWORK_FUNC_FAILURE)
+			if (error == 1)
 			{
 				printf("Error pushing to output buffer the unsent part of client number %d\n in send_info",running->client_id );
 				return NETWORK_FUNC_FAILURE;
@@ -813,6 +823,5 @@ int send_your_move(int next_player){
 		printf("can't push client_turn_message to %d\n",next_player);
 		return NETWORK_FUNC_FAILURE;
 	}
-	printf("end send_your_move\n");
 	return 0;
 }

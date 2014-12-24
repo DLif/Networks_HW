@@ -185,17 +185,13 @@ int read_openning_message(int sockfd, openning_message* msg, int* connection_clo
 {
 	
 	/* read the first byte first, to whether the connection was accepted */
- 
+ 	//printf("read_openning_message\n");
 	if(recv_all(sockfd, (char*)msg, 1, connection_closed))
 	{
 		/* error occured */
 		return CONNECTION_ERROR;
 	}
-	printf("msg->connection_accepted :%d\n", msg->connection_accepted);
-	printf("msg->isMisere :%d\n", msg->isMisere);
-	printf("msg->p :%d\n", msg->p);
-	printf("msg->client_id :%d\n", msg->client_id);
-	printf("msg->client_type :%d\n", msg->client_type);
+
 	if(msg->connection_accepted == CONNECTION_DENIED)
 	{
 		/* we have read the single byte */
@@ -209,12 +205,17 @@ int read_openning_message(int sockfd, openning_message* msg, int* connection_clo
 	}
 
 	/* else, read rest of the message */ 
-
+	//printf("recv_all number 2\n");
 	if(recv_all(sockfd, ((char*)msg) + 1, sizeof(openning_message) - 1, connection_closed))
 	{
 		/* error occured */
 		return CONNECTION_ERROR;
 	}
+	/*printf("msg->connection_accepted :%d\n", msg->connection_accepted);
+	printf("msg->isMisere :%d\n", msg->isMisere);
+	printf("msg->p :%d\n", msg->p);
+	printf("msg->client_id :%d\n", msg->client_id);
+	printf("msg->client_type :%d\n", msg->client_type);*/
 
 	return SUCCESS;
 

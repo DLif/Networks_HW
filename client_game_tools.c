@@ -81,8 +81,8 @@ void print_client_id(char id)
 }
 
 
-#define CLIENT_SPECTATOR_MSG "You are only viewing"
-#define CLIENT_PLAYER_MSG    "You are playing"
+#define CLIENT_SPECTATOR_MSG "You are only viewing \n"
+#define CLIENT_PLAYER_MSG    "You are playing \n"
 
 void print_client_type(char client_type)
 {

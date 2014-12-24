@@ -208,6 +208,12 @@ void play_nim()
 			{	
 				handle_receive_error(connection_closed);
 			}
+			/*printf("client recived bufff:\n");
+			for (int i = 0; i < num_bytes; ++i)
+			{
+				printf("%d\n", buffer[i]);
+			}
+			printf("\n");*/
 			/* try to push it onto the socket message buffer */
 			if(push(buff_socket->input_buffer, buffer, num_bytes))
 			{
@@ -216,8 +222,8 @@ void play_nim()
 				quit();
 			}
 
-                        /* see if have a server message that we can handle */
-		        handle_server_message();
+			/* see if have a server message that we can handle */
+			handle_server_message();
 				
 		}
 
@@ -225,6 +231,10 @@ void play_nim()
 		if(FD_ISSET(sockfd, &write_set))
 		{
 			// write from the output's buffer
+			if (buff_socket->output_buffer->size > 0)
+			{
+				printf("test point\n");
+			}
 			num_bytes = send_partially(sockfd, (char*)(buff_socket->output_buffer->buffer), buff_socket->output_buffer->size, &connection_closed);
 			if(num_bytes < 0)
 			{
@@ -378,7 +388,9 @@ int handle_server_message()
 {
 	
 	message_container message;
+	//printf("handle_server_message entered\n");
 	/* pop message from the buffer */
+	//printf("buff_socket->input_buffer->head %d\n",buff_socket->input_buffer->head );
 	int err_code = pop_message(buff_socket->input_buffer, &message);
 	if(err_code == MSG_NOT_COMPLETE)
 	{
@@ -394,6 +406,7 @@ int handle_server_message()
 
 
 	/* otherwise, read message from input buffer successfully */
+	//printf("message.message_type %d\n",message.message_type );
 	switch(message.message_type)
 	{
 	case HEAP_UPDATE_MSG:

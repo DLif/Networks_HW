@@ -21,12 +21,12 @@ int push(io_buffer* buff, char* source_buffer, int num_bytes)
 	int i;
 	int start_index = (buff->tail) % MAX_IO_BUFFER_SIZE;//was buff->tail+1
 	
-	printf("%d \n", start_index);
+	//printf("%d \n", start_index);
 	// push data to buffer
 
 	for( i = 0; i < num_bytes; ++i)
 	{
-		printf("source_buffer %d : %d\n",i, source_buffer[i]);
+		//printf("source_buffer %d : %d\n",i, source_buffer[i]);
 		buff->buffer[(start_index + i) % MAX_IO_BUFFER_SIZE] = source_buffer[i];
 	}
 
@@ -56,6 +56,8 @@ int pop(io_buffer* buff, char* target_buffer, int num_bytes)
 	int i ;
 
 	// fill the target buffer
+	//printf("buff->head + i %d \n",buff->head + 0 );
+	//printf("buff->buffer[(buff->head + i) mod MAX_IO_BUFFER_SIZE] %d \n",buff->buffer[(buff->head + 0) % MAX_IO_BUFFER_SIZE] );
 	for( i = 0; i < num_bytes; ++i)
 	{
 		target_buffer[i] = buff->buffer[(buff->head + i) % MAX_IO_BUFFER_SIZE];
@@ -123,18 +125,17 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 	msg_container->message_type = message_type;
 
 	int message_size = get_message_size(message_type);  /* get the size of the actual struct    */
-
 	if(message_size < 0)
 	{
 		/* invalid message */
 		return INVALID_MESSAGE;
 	}
 
-	if(message_size == 1)
+	/*if(message_size == 1)
 	{
-		/* we only needed to read a single byte, that defines the message */
+		// we only needed to read a single byte, that defines the message -WHY???????? WTF
 		return SUCCESS;
-	}
+	}*/
 
 	/* check if we can pop the header */
 	if(buff->size >= message_size)
