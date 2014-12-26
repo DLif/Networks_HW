@@ -21,12 +21,11 @@ int push(io_buffer* buff, char* source_buffer, int num_bytes)
 	int i;
 	int start_index = (buff->tail) % MAX_IO_BUFFER_SIZE;//was buff->tail+1
 	
-	//printf("%d \n", start_index);
 	// push data to buffer
 
 	for( i = 0; i < num_bytes; ++i)
 	{
-		//printf("source_buffer %d : %d\n",i, source_buffer[i]);
+		
 		buff->buffer[(start_index + i) % MAX_IO_BUFFER_SIZE] = source_buffer[i];
 	}
 
@@ -55,9 +54,7 @@ int pop(io_buffer* buff, char* target_buffer, int num_bytes)
 
 	int i ;
 
-	// fill the target buffer
-	//printf("buff->head + i %d \n",buff->head + 0 );
-	//printf("buff->buffer[(buff->head + i) mod MAX_IO_BUFFER_SIZE] %d \n",buff->buffer[(buff->head + 0) % MAX_IO_BUFFER_SIZE] );
+
 	for( i = 0; i < num_bytes; ++i)
 	{
 		target_buffer[i] = buff->buffer[(buff->head + i) % MAX_IO_BUFFER_SIZE];
@@ -158,7 +155,6 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 	/* the first byte is is at index head                              */
 	char message_type = buff->buffer[buff->head];
 
-	printf("message type: %d\n", message_type);
 
 	int message_size = get_message_size(message_type);  /* get the size of the actual struct    */
 	if(message_size < 0)
@@ -173,17 +169,13 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 		if(message_type == MSG) /* client to client message */
 		{
 			pop(buff, (char*)msg_container, message_size);
-			printf("popped %d\n", message_size);
-			printf("trying to read msg, BUFF size %d\n", buff->size);
 			client_to_client_message* msg = (client_to_client_message*)msg_container;
-			printf("but message size is %d\n", msg->length);
 			
 
 			/* we also need to check that the actual message is on the buffer */
 			if(buff->size >= (unsigned char)(msg->length))
 			{
 				// the actual message is in the buffer
-				// pop the header and store it in msg_container
 				
 
 				if(valiadate_message(msg_container))
@@ -192,8 +184,6 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 					return INVALID_MESSAGE;
 				}
 
-
-				printf("%d %d %d %d\n", msg->message_type, msg->sender_id, msg->destination_id, msg->length);
 
 				return SUCCESS;
 			}
@@ -221,7 +211,6 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 				{
 					heap_msg->heaps[i] = ntohs(heap_msg->heaps[i]);
 
-					printf("heap %d is %d\n", i, heap_msg->heaps[i]);
 				}
 
 			}
@@ -233,7 +222,6 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 				
 			}
 
-			printf("message size: %d\n", message_size);
 
 			if(message_size == 1)
 			{
@@ -244,10 +232,10 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 
 			if(valiadate_message(msg_container))
 			{
-				printf("BEFORE INVALID %d\n", message_size);
+			
 				return INVALID_MESSAGE;
 			}
-			printf("AFTER INVALID %d\n", message_size);
+			
 
 			
 			return SUCCESS;

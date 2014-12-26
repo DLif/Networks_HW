@@ -186,7 +186,7 @@ int read_openning_message(int sockfd, openning_message* msg, int* connection_clo
 {
 	
 	/* read the first byte first, to whether the connection was accepted */
- 	//printf("read_openning_message\n");
+ 	
 	if(recv_all(sockfd, (char*)msg, 1, connection_closed))
 	{
 		/* error occured */
@@ -206,17 +206,13 @@ int read_openning_message(int sockfd, openning_message* msg, int* connection_clo
 	}
 
 	/* else, read rest of the message */ 
-	//printf("recv_all number 2\n");
+	
 	if(recv_all(sockfd, ((char*)msg) + 1, sizeof(openning_message) - 1, connection_closed))
 	{
 		/* error occured */
 		return CONNECTION_ERROR;
 	}
-	/*printf("msg->connection_accepted :%d\n", msg->connection_accepted);
-	printf("msg->isMisere :%d\n", msg->isMisere);
-	printf("msg->p :%d\n", msg->p);
-	printf("msg->client_id :%d\n", msg->client_id);
-	printf("msg->client_type :%d\n", msg->client_type);*/
+
 
 	return SUCCESS;
 
@@ -241,15 +237,12 @@ int valiadate_message(message_container* msg)
 		{
 			heap_update_message* temp = (heap_update_message*)msg;
 			if (temp->game_over != GAME_OVER && temp->game_over != GAME_CONTINUES)
-			{	//printf("game over is: %d\n", temp->game_over);
+			{	
 				return 1;
 			}
 			int i;
 
-			//for(i = 0; i < NUM_HEAPS; ++i)
-			//{
-			//	printf("heap %d is: %d\n", i, temp->heaps[i]);
-			//}
+			
 			for(i = 0; i < NUM_HEAPS; ++i)
 			{
 				// check if heap values are valid 

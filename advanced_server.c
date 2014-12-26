@@ -67,6 +67,7 @@ int main( int argc, const char* argv[] ){
 
 	close_socket(listeningSoc);
 
+
 	/* free all the client structs and close all the file descriptors */
 	free_list(&clients_linked_list, true);
 
@@ -104,7 +105,7 @@ void play_nim(int listeningSoc){
 		//check if there is a new requests to connect - and add it
 		if (FD_ISSET(listeningSoc,&read_set))
 		{
-			printf("new client\n");
+			
 			if( get_new_connections(listeningSoc))
 			{
 				/* error is printed in the method itself */
@@ -206,7 +207,7 @@ int get_new_connections(int listeningSoc){
 
 		/* we have room for more clients, but we've reached the maximum player limit */
 		/* this client will be a spectator */
-		printf("new SPECTATOR number %d\n", new_client_id);
+		
 		
 		/* allocate a new buffer abstraction */
 		new_client = create_buff_socket(toClientSocket, SPECTATOR, new_client_id);
@@ -231,7 +232,7 @@ int get_new_connections(int listeningSoc){
 			close_socket(toClientSocket);
 			return 1;
 		}
-		printf("new PLAYER number %d\n", new_client_id);
+		
 		++current_player_num;
 		
 		
@@ -242,7 +243,6 @@ int get_new_connections(int listeningSoc){
 	// create openning message (accepting message with the relevant info )
 	create_openning_message(&first_msg, IsMisere, max_players_allowed, new_client_id, new_client->client_stat);
 
-	printf("should push %d bytes\n", sizeof(openning_message));
 
 	if(push(new_client->output_buffer,(char*)(&first_msg), sizeof(openning_message)))
 	{
@@ -250,8 +250,22 @@ int get_new_connections(int listeningSoc){
 		return 1;
 
 	}
+
+
+	// create heap update message
+
+	heap_update_message heap_msg;
+	// GAME_CONTINUES since we wouldnt be here if game was over
+	create_heap_update_message(&heap_msg, heaps_array, GAME_CONTINUES);
+
+	if ( push(new_client->output_buffer,(char*)(&heap_msg), sizeof(heap_update_message)) )	
+	{
+		printf("Error: could not push update message onto client %d output buffer (buffer full)\n", new_client->client_id);
+		return ERROR;
+	}
+
+
 	
-	printf("head: %d, tail %d, size %d \n", new_client->output_buffer->head, new_client->output_buffer->tail, new_client->output_buffer->size);
 
 	if(new_client->client_stat == PLAYER && current_player_num == 1)
 	{
@@ -260,7 +274,7 @@ int get_new_connections(int listeningSoc){
 		// notify the player that it is his turn
 		if(send_your_move()== ERROR)
 			return ERROR;
-		printf("head: %d, tail %d, size %d \n", new_client->output_buffer->head, new_client->output_buffer->tail, new_client->output_buffer->size);
+		
 	}
 
 	return 0; // OK
@@ -487,8 +501,7 @@ int chat_message_handle(int sender_id, client_to_client_message *message){
 				return ERROR;
 			}
 
-			temp_buff[3] = 0;
-			printf("pushed message %s\n", temp_buff);
+			
 		}
 		// otherwise, ignore it (note that we really poped it )
 	}
@@ -518,7 +531,6 @@ int game_message_handle(int client_id, player_move_msg* message){
 	if (current_turn == client_id)
 	{
 		// handle move
-		printf("client %d made turn\n", client_id);
 		int is_legal_move;
 
 		// actually make the move
@@ -596,8 +608,6 @@ int quit_client_handle(int quiting_client){
 
 	int error =0;
 
-	printf("quiting client %d\n", quiting_client);
-
 	if (get_buffered_socket_by_id(quiting_client)->client_stat == PLAYER)
 	{
 		current_player_num--;
@@ -615,7 +625,7 @@ int quit_client_handle(int quiting_client){
 		}
 
 		// delete
-		delete_by_client_id(&clients_linked_list,quiting_client);
+		delete_by_client_id(&clients_linked_list, quiting_client);
 
 
 		//try to promote player
@@ -636,8 +646,6 @@ int quit_client_handle(int quiting_client){
 			}
 			if(current_player_num == 0)
 			{
-				printf("reached here\n");
-				printf("%d %d %d\n", clients_linked_list.size, (int)clients_linked_list.first, (int)clients_linked_list.last);
 				current_turn = 0; /* pause the game */
 			}
 
@@ -646,11 +654,12 @@ int quit_client_handle(int quiting_client){
 
 		// else, gotta promote new_player_id
 
+		
 		promotion_msg promote_mes;
 		create_promotion_message(&promote_mes);
 
 		buffered_socket* client_sock = get_buffered_socket_by_id(new_player_id);
-
+		
 		//push message
 		error = push(client_sock->output_buffer,(char*)(&promote_mes),sizeof(promotion_msg));
 		if (error == OVERFLOW_ERROR)
@@ -659,14 +668,18 @@ int quit_client_handle(int quiting_client){
 			return ERROR;
 		}
 
+
 		// successfully promoted
 		++ current_player_num;
-
+		
+		client_sock->client_stat = PLAYER;
 
 		if(update_turn)
 		{
 			/* there is atleast one player at this point */
 			current_turn = get_next_player_id(&clients_linked_list, next_player);
+			
+
 			if(send_your_move() == ERROR)
 				/* notify the new player */
 				return ERROR;
@@ -696,7 +709,6 @@ int send_heaps_update(int game_over){
 	buffered_socket* running = NULL; /* iterator */
 	int error ;
 
-	printf("send heaps to all\n");
 	heap_update_message heap_msg;
 	create_heap_update_message(&heap_msg, heaps_array, (char)game_over);
 
@@ -711,6 +723,8 @@ int send_heaps_update(int game_over){
 
 		if(game_over == GAME_OVER)
 		{
+
+			
 			char status;
 			if(running->client_id == current_turn)
 			{
@@ -828,7 +842,7 @@ int read_to_buffs(fd_set* read_set){
 
 		if (FD_ISSET(cur_socket,read_set)){
 
-			printf("reading from socket\n");
+			
 			/* check if socket is read ready */
 			bytes_recv = recv(cur_socket, recv_buff, MAX_IO_BUFFER_SIZE, 0);
 			if (bytes_recv < 0)
@@ -839,10 +853,10 @@ int read_to_buffs(fd_set* read_set){
 			else if (bytes_recv == 0) 
 			//in this case - connection closed by user 
 			{
-				printf("reading from socket, recv 0 \n");
+				
 				// save next client
 				next = p->next_client;
-				printf("next: %s\n", next == NULL ? "null" : "something");
+				
 				quit_client_handle(p->client_id);
 				p = next;
 				continue;
@@ -905,9 +919,6 @@ void send_info(fd_set* write_set){
 			}
 		
 			
-			printf("to client %d sent %d bytes\n", running->client_id, bytes_read);
-			
-		
 			//pop all the information we were able to send
 			pop_no_return(running->output_buffer, bytes_read);
 			
@@ -1004,14 +1015,18 @@ int send_final_data(){
 			return ERROR;
 		}
 
-		printf(" .. emptying buffers\n");
 
 		//check if all buffers are empty and check who quit
 
 		for(running = clients_linked_list.first ; running != NULL; )
 		{
+
+			
 			if (FD_ISSET(running->sockfd,&read_set))
 			{
+
+			
+
 				char temp;
 				if(recv(running->sockfd, &temp, 1, 0) <= 0)
 				{
@@ -1028,22 +1043,25 @@ int send_final_data(){
 			}
 			if (running->output_buffer->size > 0)
 			{
+				
 				finished_sending = false;
 			}
-	
-
-			running = running->next_client; 
 		
+			
+			running = running->next_client; 
+			
 		}
 
 
 		if (!finished_sending)
 		{
+			
 			// send to all the write ready
 			send_info(&write_set);
 	
 		}
 		else{
+			
 			// finished sending all sockets, may exit
 			return 0;
 		}
@@ -1118,13 +1136,13 @@ bool checkServerArgsValidity(int argc,const char* argv[]){
 int send_your_move(){
 
 	int error =0;
-	printf("send your_turn_move to client %d\n", current_turn);
-
+	
 	client_turn_message your_turn_move;
 	//fill send buff
 	create_client_turn_message(&your_turn_move);
 	//push message
 	error = push(get_buffered_socket_by_id(current_turn)->output_buffer,(char*)(&your_turn_move),sizeof(client_turn_message));
+	
 	
 	if (error == OVERFLOW_ERROR)
 	{

@@ -212,13 +212,7 @@ void play_nim()
 			{	
 				handle_receive_error(connection_closed);
 			}
-			/*printf("client recived bufff:\n");
-			for (int i = 0; i < num_bytes; ++i)
-			{
-				printf("%d\n", buffer[i]);
-			}
-			printf("\n");*/
-			/* try to push it onto the socket message buffer */
+			
 			if(push(buff_socket->input_buffer, buffer, num_bytes))
 			{
 				/* input buffer is full */
@@ -230,31 +224,18 @@ void play_nim()
 		}
 
 
+
 		// see if we can write into the server's socket and we have something to write
 		if(FD_ISSET(sockfd, &write_set) && buff_socket->output_buffer->size > 0)
 		{
 			// write from the output's buffer
-			if (buff_socket->output_buffer->size > 0)
-			{
-				printf("test point\n");
-			}
+		
 			num_bytes = send_partially_from_buffer(buff_socket->output_buffer,sockfd, buff_socket->output_buffer->size, &connection_closed);
 			if(num_bytes < 0)
 			{
 				handle_send_error(connection_closed);
 			}
-
-			if(debug)
-			{
-				printf("sent num_bytes %d, 4 first: %c%c%c%c, 3 later, %c%c%c ", num_bytes, buff_socket->output_buffer->buffer[buff_socket->output_buffer->head],
-															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 1],
-															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 2],
-															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 3],
-															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 4],
-															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 5],
-															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 6]);
-
-			}			
+			
 
 			// pop num_bytes bytes from the buffer
 			pop_no_return(buff_socket->output_buffer, num_bytes);
@@ -376,7 +357,6 @@ void handle_user_input()
 	while((c = getchar()) != -1 && count < MAX_MSG_SIZE)
 	{
 		if(c != '\n'){
-			printf("%c\n", c);
 			buffer_msg[count] = c;
 			count++;
 		}
@@ -401,21 +381,15 @@ void handle_user_input()
 		quit();
 	}
 
-	buffer_msg[count] = 0;
-	printf("the message:%s, %d\n", buffer_msg, count);
 	
 	/* create the message struct */
 	client_to_client_message message;
 	create_client_to_client_message(&message, (char)client_id, destination_id, (char)count);
 
-	printf("send info: sender %d, dest %d\n", client_id, destination_id);
-
-	printf("gonna send: %d\n", sizeof(message) + count);
 
 	/* try to push it onto the socket output buffer to be sent later */
 	if(push(buff_socket->output_buffer, (char*)(&message), sizeof(message)) || push(buff_socket->output_buffer, buffer_msg, count))
 	{
-
 		
 		/* output buffer is full */
 		printf("Error: socket output buffer size limit reached\n");
@@ -440,9 +414,7 @@ int handle_server_message()
 {
 	
 	message_container message;
-	//printf("handle_server_message entered\n");
-	/* pop message from the buffer */
-	//printf("buff_socket->input_buffer->head %d\n",buff_socket->input_buffer->head );
+
 	int err_code = pop_message(buff_socket->input_buffer, &message);
 	if(err_code == MSG_NOT_COMPLETE)
 	{
@@ -473,7 +445,7 @@ int handle_server_message()
 		print_message_acked(message.message_type);
 		break;
 	case MSG:
-		printf("YAY!!\n");
+
 		handle_player_message((client_to_client_message*)(&message));
 		break;
 	case PROMOTION_MSG:
@@ -708,6 +680,15 @@ void handle_receive_error( int connection_closed)
 
 	if(connection_closed)
 	{
+
+		while(handle_server_message() != MSG_NOT_COMPLETE) {  
+			/* parse all messages untill the point we cant parse anymore messages since we're stuck.
+			in this case connection was closed wrongfully and we will print the error
+			if some invalid message was on the buffer we will print that error first 
+			if valid exit message was in the buffer, we will exit correctly 
+			*/
+		} 
+
 		/* other end was closed */
 		print_closed_connection();
 	}

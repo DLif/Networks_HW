@@ -18,7 +18,6 @@ buffered_socket* create_buff_socket(int sockfd, int type, int client_id)
 {
 	buffered_socket* res = (buffered_socket*)malloc(sizeof(buffered_socket));
 
-	printf("visited malloc\n");
 
 	if( res == NULL)
 	{
@@ -52,7 +51,6 @@ buffered_socket* create_buff_socket(int sockfd, int type, int client_id)
 	/* clear input buffer */
 	clear_io_buffer(res->output_buffer);
 
-	printf("OMG %d %d %d\n" ,res->output_buffer->size, res->output_buffer->head,  res->output_buffer->tail);
 
 
 	res->client_stat = type;

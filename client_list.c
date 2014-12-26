@@ -76,8 +76,7 @@ int get_min_spectator_id(client_list* list)
 */
 void free_list(client_list* list, int free_sockets)
 {
-	buffered_socket* p    = list->first;
-	buffered_socket* next = p->next_client; /* maintain next! */
+	buffered_socket* next, *p    = list->first;
 	
 	if(free_sockets)
 	{
@@ -98,6 +97,7 @@ void free_list(client_list* list, int free_sockets)
 	while( p != NULL)
 	{
 		/* this frees p itself as well */
+		next = p->next_client;
 		free_buff_socket(p);
 		p = next;
 	}
@@ -220,9 +220,8 @@ void delete_by_client_id(client_list* list, int client_id)
 		return ;
 	}
 
-
-	p = p->next_client;
 	buffered_socket* prev = p ;
+	p = p->next_client;
 
 	while(p != NULL)
 	{

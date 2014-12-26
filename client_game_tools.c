@@ -71,13 +71,13 @@ void print_connection_refused()
 #define NUMBER_OF_PLAYERS  "Number of players is "
 void print_num_players(char p)
 {
-	printf("%s%u", NUMBER_OF_PLAYERS, p);
+	printf("%s%u\n", NUMBER_OF_PLAYERS, p);
 }
 
 #define CLIENT_ID "You are client "
 void print_client_id(char id)
 {
-	printf("%s%u", CLIENT_ID, id);
+	printf("%s%u\n", CLIENT_ID, id);
 }
 
 
@@ -92,15 +92,15 @@ void print_client_type(char client_type)
 		printf(CLIENT_SPECTATOR_MSG);
 }
 
-#define GAME_OVER_MSG "Game over!"
+#define GAME_OVER_MSG "Game over!\n"
 
 void print_game_over_spectator()
 {
 	printf(GAME_OVER_MSG);
 }
 
-#define CLIENT_WON_STR "You win!"
-#define CLIENT_LOST_STR "You lose!"
+#define CLIENT_WON_STR "You win!\n"
+#define CLIENT_LOST_STR "You lose!\n"
 
 void print_game_over(int win_status)
 {
