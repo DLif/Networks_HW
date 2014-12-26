@@ -222,10 +222,9 @@ void play_nim()
 				quit();
 			}
 
-			/* see if have a server message that we can handle */
-			handle_server_message();
 				
 		}
+
 
 		// see if we can write into the server's socket
 		if(FD_ISSET(sockfd, &write_set))
@@ -244,6 +243,9 @@ void play_nim()
 			// pop num_bytes bytes from the buffer
 			pop_no_return(buff_socket->output_buffer, num_bytes);
 		}
+
+		/* see if have a server message that we can handle */
+		handle_server_message();
 
 	}
 	
