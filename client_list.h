@@ -2,7 +2,7 @@
 #define CLIENT_LIST_H
 
 #include "buffered_socket.h"
-
+#define MAX_CLIENTS 9
 
 /* represents a list of clients */
 
@@ -43,8 +43,10 @@ void delete_by_client_id(client_list* list, int client_id);
 	this method frees the given list
 	the method does not frees the list itself, but rather its content
 	it is assumed that list was not allocated using malloc, but rather a local/global variable
+
+	if free_sockets == 1 the socket descriptors will be closed together with the buffers
 */
-void free_list(client_list* list);
+void free_list(client_list* list, int free_sockets);
 
 
 /*
@@ -69,7 +71,7 @@ int get_next_player_id(client_list* list, buffered_socket* current);
 
 /*
 	this method finds the minimum spectator id in the given list
-	returns MAX_CLIENTS + 1 if no spectators found
+	returns max_client_num + 1 if no spectators found
 */
 
 int get_min_spectator_id(client_list* list);

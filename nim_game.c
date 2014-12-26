@@ -21,20 +21,20 @@ void init_game(bool IsMisere_arg, short heaps_size){
 	NOTE: if heap_num is invalid or size is invalid, method returns false.
 		  otherwise, returns true
 */
-bool makeClientMove (unsigned char heap_num, unsigned short size) {
+int makeClientMove (unsigned char heap_num, unsigned short size) {
 	
 	if(heap_num > HEAPS_NUM - 1)
 		// heap index too large
-		return false;
+		return 0;
 
 	unsigned int_heapNum = (unsigned)heap_num;
 
 	if ((unsigned)heaps_array[int_heapNum] < size || size == 0) 
-		return false;
+		return 0;
 	
 	// actually make the move
 	heaps_array[int_heapNum] -= size;
-	return true;
+	return 1;
 	
 }
 
@@ -108,7 +108,7 @@ void makeServerMove(){
 	for multiplay- if return SERVER curr player lost, else curr player won
 */
 
-int makeRound(char player_heapNum, short player_size, bool *isLegalMove){
+int makeRound(char player_heapNum, short player_size, int *isLegalMove){
 	//make the player move and save the answer to the qustion "was the move legal"
 	*isLegalMove = makeClientMove((unsigned char)player_heapNum, (unsigned short)player_size);
 	

@@ -17,6 +17,9 @@
 buffered_socket* create_buff_socket(int sockfd, int type, int client_id)
 {
 	buffered_socket* res = (buffered_socket*)malloc(sizeof(buffered_socket));
+
+	printf("visited malloc\n");
+
 	if( res == NULL)
 	{
 		printf("Error: malloc failed to allocate memory for buffered socket: %d\n", sockfd);
@@ -32,7 +35,12 @@ buffered_socket* create_buff_socket(int sockfd, int type, int client_id)
 		return NULL;
 	}
 
+	/* clear input buffer */
+	clear_io_buffer(res->input_buffer);
+
 	res->output_buffer = (io_buffer*)malloc(sizeof(io_buffer));
+
+
 	if(res->output_buffer == NULL)
 	{
 		printf("Error: malloc failed to allocate memory for output buffer, of socket %d\n", sockfd);
@@ -40,6 +48,11 @@ buffered_socket* create_buff_socket(int sockfd, int type, int client_id)
 		free(res);
 		return NULL;
 	}
+
+	/* clear input buffer */
+	clear_io_buffer(res->output_buffer);
+
+	printf("OMG %d %d %d\n" ,res->output_buffer->size, res->output_buffer->head,  res->output_buffer->tail);
 
 
 	res->client_stat = type;

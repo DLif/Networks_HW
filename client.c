@@ -47,6 +47,10 @@ static int client_type;                       /* holds SPECTATOR or PLAYER */
 static int client_turn;                       /* 1 iff it is currently this clients turn */
 static unsigned char client_id;
 
+
+
+int debug = 0;
+
 int main(int argc, char* argv[])
 {
 
@@ -226,8 +230,8 @@ void play_nim()
 		}
 
 
-		// see if we can write into the server's socket
-		if(FD_ISSET(sockfd, &write_set))
+		// see if we can write into the server's socket and we have something to write
+		if(FD_ISSET(sockfd, &write_set) && buff_socket->output_buffer->size > 0)
 		{
 			// write from the output's buffer
 			if (buff_socket->output_buffer->size > 0)
@@ -239,6 +243,18 @@ void play_nim()
 			{
 				handle_send_error(connection_closed);
 			}
+
+			if(debug)
+			{
+				printf("sent num_bytes %d, 4 first: %c%c%c%c, 3 later, %c%c%c ", num_bytes, buff_socket->output_buffer->buffer[buff_socket->output_buffer->head],
+															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 1],
+															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 2],
+															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 3],
+															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 4],
+															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 5],
+															buff_socket->output_buffer->buffer[buff_socket->output_buffer->head + 6]);
+
+			}			
 
 			// pop num_bytes bytes from the buffer
 			pop_no_return(buff_socket->output_buffer, num_bytes);
@@ -291,11 +307,14 @@ void handle_user_input()
 	}
 
 	char buffer[10];
-	if(scanf("%2s", buffer) != 2)
+	if(scanf("%2s", buffer) != 1)
 	{
+	
 		printf(USER_INPUT_ERR);
 		quit();
 	}
+
+	printf("reached here\n");
 
 	/* close string */
 	buffer[2] = 0;
@@ -333,14 +352,34 @@ void handle_user_input()
 		destination_id = (char)temp;
 
 	/* read the actual message */
-	char buffer_msg[MAX_MSG_SIZE];
+
 	int c ; 
-	int count = 1;
+
+	/* skip the first space */
+
+	c = getchar();
+	if(c == -1)
+	{
+		printf("Error: error occured while reading input from user\n");
+		quit();
+	}
+	if(c != ' ')
+	{
+		printf("Error: invalid input format, expected exactly one space after destination\n");
+		quit();
+	}
+	
+
+	char buffer_msg[MAX_MSG_SIZE];
+	int count = 0;
 	int success = 0;
 	while((c = getchar()) != -1 && count < MAX_MSG_SIZE)
 	{
-		if(c != '\n')
-			buffer_msg[count-1] = c;
+		if(c != '\n'){
+			printf("%c\n", c);
+			buffer_msg[count] = c;
+			count++;
+		}
 		else
 		{
 			success = 1;
@@ -361,18 +400,29 @@ void handle_user_input()
 			printf("Error: entered message exceeds maximum message length, which is 255 chars\n");
 		quit();
 	}
+
+	buffer_msg[count] = 0;
+	printf("the message:%s, %d\n", buffer_msg, count);
 	
 	/* create the message struct */
 	client_to_client_message message;
 	create_client_to_client_message(&message, (char)client_id, destination_id, (char)count);
 
+	printf("send info: sender %d, dest %d\n", client_id, destination_id);
+
+	printf("gonna send: %d\n", sizeof(message) + count);
+
 	/* try to push it onto the socket output buffer to be sent later */
 	if(push(buff_socket->output_buffer, (char*)(&message), sizeof(message)) || push(buff_socket->output_buffer, buffer_msg, count))
 	{
+
+		
 		/* output buffer is full */
 		printf("Error: socket output buffer size limit reached\n");
 		quit();
 	}
+
+	debug = 1;
 	
 }
 
@@ -423,6 +473,7 @@ int handle_server_message()
 		print_message_acked(message.message_type);
 		break;
 	case MSG:
+		printf("YAY!!\n");
 		handle_player_message((client_to_client_message*)(&message));
 		break;
 	case PROMOTION_MSG:
@@ -457,7 +508,7 @@ void handle_player_message(client_to_client_message* msg)
 	pop(buff_socket->input_buffer, msg_buffer, message_size);
 
 	// print the message to the client
-	printf("%u: %s", msg->sender_id, msg_buffer);
+	printf("%u: %s\n", msg->sender_id, msg_buffer);
 
 }
 
@@ -642,7 +693,7 @@ void handle_openning_message()
 		// malloc error
 		quit();
 	}
-
+	
 	// print the openning message
 	proccess_openning_message(&msg);
 

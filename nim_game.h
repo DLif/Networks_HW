@@ -20,10 +20,10 @@ void init_game(bool IsMisere, short heaps_size);
 /* 
 	this function makes a move in the game according to given heap index (between 0 and HEAPS_NUM-1) and how much to remove(the parameter size).
 	heap_num and size are considered as unsigned numbers
-	NOTE: if heap_num is invalid or size is invalid, method returns false.
-		  otherwise, returns true
+	NOTE: if heap_num is invalid or size is invalid, method returns false[0].
+		  otherwise, returns true[1]
 */
-bool makeClientMove (unsigned char heap_num ,unsigned short size);
+int makeClientMove (unsigned char heap_num ,unsigned short size);
 
 /* this function will check all heaps and determine is the game over and who's the victor;
   returns CLIENT for the client victory, NONE if the game isn't over and SERVER for server victory.
@@ -47,4 +47,4 @@ int is_victory();
 	returns CLIENT for the client victory, NONE if the game isn't over and SERVER for server victory.
 	*isLegalMove will contain false if the user move was ilegal, else true (acked)
 */
-int makeRound(char heap_index, short player_size, bool *isLegalMove);
+int makeRound(char heap_index, short player_size, int *isLegalMove);

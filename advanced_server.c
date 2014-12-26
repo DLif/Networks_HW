@@ -65,10 +65,10 @@ int main( int argc, const char* argv[] ){
 
 	// free resources
 
-	free_socket(listeningSoc);
+	close_socket(listeningSoc);
 
 	/* free all the client structs and close all the file descriptors */
-	free_list(&client_linked_list, true);
+	free_list(&clients_linked_list, true);
 
 }
 
@@ -84,12 +84,7 @@ void play_nim(int listeningSoc){
 	fd_set read_set;
 	fd_set write_set;
 	int fd_max= -1;
-
-	// next client id to play
-	int next_to_move = 0;
-
-	// game_stat will report errors or end game
-	int game_stat = GAME_CONTINUES;
+	
 	int error = 0;
 
 	while(1){
@@ -143,14 +138,9 @@ void play_nim(int listeningSoc){
 
 
 		//send iformation from write buffes to ready sockes
-		error = send_info(write_set); 
-		if (error )
-		{
-			#ifdef __DEBUG__
-			printf("Errors in send_info");
-			#endif
-			return ;
-		}
+		// method returns void, drops problematic connections
+		send_info(&write_set); 
+	
 
 	}
 	
@@ -168,7 +158,6 @@ void play_nim(int listeningSoc){
 */
 int get_new_connections(int listeningSoc){
 
-	int error = 0;
 
 	//in this variable we save the client's address information
 	struct sockaddr_in clientAdderInfo;
@@ -194,7 +183,7 @@ int get_new_connections(int listeningSoc){
 	/* get the next id to be allocated (minimum that is not taken ) */
 	int new_client_id = get_minimum_free_client_id(&clients_linked_list);
 
-	if (clients_linked_list->size == MAX_CLIENTS)
+	if (clients_linked_list.size == MAX_CLIENTS)
 	{
 
 		/* we've already received MAX_CLIENTS connections, must decline this connection */
@@ -253,12 +242,16 @@ int get_new_connections(int listeningSoc){
 	// create openning message (accepting message with the relevant info )
 	create_openning_message(&first_msg, IsMisere, max_players_allowed, new_client_id, new_client->client_stat);
 
+	printf("should push %d bytes\n", sizeof(openning_message));
+
 	if(push(new_client->output_buffer,(char*)(&first_msg), sizeof(openning_message)))
 	{
 		printf("Error: unable to push first message to client %d\n", new_client_id);
 		return 1;
 
 	}
+	
+	printf("head: %d, tail %d, size %d \n", new_client->output_buffer->head, new_client->output_buffer->tail, new_client->output_buffer->size);
 
 	if(new_client->client_stat == PLAYER && current_player_num == 1)
 	{
@@ -267,7 +260,7 @@ int get_new_connections(int listeningSoc){
 		// notify the player that it is his turn
 		if(send_your_move()== ERROR)
 			return ERROR;
-
+		printf("head: %d, tail %d, size %d \n", new_client->output_buffer->head, new_client->output_buffer->tail, new_client->output_buffer->size);
 	}
 
 	return 0; // OK
@@ -297,12 +290,12 @@ int handle_ready_messages()
 
 	buffered_socket* client;
 	message_container abs_message;
-	int err;
+	int err, pop_stat;
 
 	//pop all whole commands - and handle chat and quit
 	for(client = clients_linked_list.first; client != NULL; client = client->next_client)
 	{
-		pop_stat = pop_message(running->input_buffer, &abs_message);
+		pop_stat = pop_message(client->input_buffer, &abs_message);
 
 		if (pop_stat == MSG_NOT_COMPLETE) { continue; }
 
@@ -310,15 +303,15 @@ int handle_ready_messages()
 		{
 			//undefined message
 
-			printf("Error: invalid message received from client id %d\n", running->client_id );
+			printf("Error: invalid message received from client id %d\n", client->client_id );
 			return ERROR;
 		}
 		else { 
 
 			//must be pop_stat == SUCCESS
-			if (abs_message->message_type == PLAYER_MOVE_MSG)
+			if (abs_message.message_type == PLAYER_MOVE_MSG)
 			{
-				if((err = game_message_handle( running->client_id,(player_move_msg*)(&abs_message))) == ERROR)
+				if((err = game_message_handle( client->client_id,(player_move_msg*)(&abs_message))) == ERROR)
 				{
 					// error
 					return ERROR;
@@ -326,9 +319,9 @@ int handle_ready_messages()
 				else if(err == END_GAME)
 					return END_GAME;
 			}
-			else if (abs_message->message_type == MSG){
+			else if (abs_message.message_type == MSG){
 
-				if(chat_message_handle(running->client_id, (client_to_client_message*)(&abs_message)))
+				if(chat_message_handle(client->client_id, (client_to_client_message*)(&abs_message)))
 				{
 					// error
 					return ERROR;
@@ -337,7 +330,7 @@ int handle_ready_messages()
 			else { 
 
 				//error in message type, message intented to be sent to clients
-				printf("Error: invalid message received from client id %d\n", running->client_id);
+				printf("Error: invalid message received from client id %d\n", client->client_id);
 				return ERROR;
 			}
 		}
@@ -358,7 +351,7 @@ int initServer(short port){
 	int listeningSocket= socket(PF_INET, SOCK_STREAM, 0); 
 	if (listeningSocket < 0){
 		printf("Error: failed to create socket: %s\n", strerror(errno));
-		return NETWORK_FUNC_FAILURE;
+		return ERROR;
 	}
 	//fill sockadder struct with correct parameters
 	adderInfo.sin_family = AF_INET;
@@ -369,14 +362,14 @@ int initServer(short port){
 	if ( bind(listeningSocket,(struct sockaddr*) &adderInfo, sizeof(adderInfo)) < 0 ){
 		printf("Error: failed to bind listening socket: %s\n", strerror(errno));
 		close(listeningSocket);
-		return NETWORK_FUNC_FAILURE;
+		return ERROR;
 	}
 
 	// listen to connections
 	if ( listen(listeningSocket, MAX_CLIENTS+1) < 0){
 		printf("Error: listening error: %s\n", strerror(errno));
 		close(listeningSocket);
-		return NETWORK_FUNC_FAILURE;
+		return ERROR;
 	}
 	return listeningSocket;
 }
@@ -430,7 +423,6 @@ int chat_message_handle(int sender_id, client_to_client_message *message){
 
 	buffered_socket * running = NULL;
 	
-	int error =0;
 
 	// allocate temp buffer to read the message to 
 	char temp_buff[MAX_MSG_SIZE];
@@ -447,7 +439,7 @@ int chat_message_handle(int sender_id, client_to_client_message *message){
 
 
 	// error cannot happen here, we know we can safely pop the message (verified by pop_message)
-	pop(get_buffered_socket_by_id(sender_id)->output_buffer, temp_buff, (unsigned char)(chat_header->length));
+	pop(get_buffered_socket_by_id(sender_id)->input_buffer, temp_buff, (unsigned char)(message->length));
 	
 	if (message->destination_id == -1)
 	{
@@ -465,7 +457,7 @@ int chat_message_handle(int sender_id, client_to_client_message *message){
 			}
 
 			// push the message itself
-			if( push(running->output_buffer, temp_buff, (unsigned char)(chat_header->length)) )
+			if( push(running->output_buffer, temp_buff, (unsigned char)(message->length)) )
 			{
 				printf("Error: could not push message onto client %u buffer (BUFFER FULL!)\n", running->client_id);
 				return ERROR;
@@ -476,7 +468,7 @@ int chat_message_handle(int sender_id, client_to_client_message *message){
 
 		// check dest validity and send to specific client
 
-		buffered_socket* dest_buff_socket = get_buffered_socket_by_id( (unsigned char)(message->destination-id));
+		buffered_socket* dest_buff_socket = get_buffered_socket_by_id( (unsigned char)(message->destination_id));
 		if (dest_buff_socket != NULL)
 		{
 			// send the message
@@ -489,11 +481,14 @@ int chat_message_handle(int sender_id, client_to_client_message *message){
 			}
 
 			// push the message itself
-			if( push(dest_buff_socket->output_buffer, temp_buff, (unsigned char)(chat_header->length)) )
+			if( push(dest_buff_socket->output_buffer, temp_buff, (unsigned char)(message->length)) )
 			{
 				printf("Error: could not push message onto client %u buffer (BUFFER FULL!)\n", dest_buff_socket->client_id);
 				return ERROR;
 			}
+
+			temp_buff[3] = 0;
+			printf("pushed message %s\n", temp_buff);
 		}
 		// otherwise, ignore it (note that we really poped it )
 	}
@@ -527,7 +522,7 @@ int game_message_handle(int client_id, player_move_msg* message){
 		int is_legal_move;
 
 		// actually make the move
-		round_result = makeRound(message->heap_index, message->amount_to_remove, &is_legal_move);
+		int round_result = makeRound(message->heap_index, message->amount_to_remove, &is_legal_move);
 		
 		// send the ack to the client
 		error = send_move_ACK(client_id, is_legal_move);
@@ -598,10 +593,10 @@ int game_message_handle(int client_id, player_move_msg* message){
 }
 
 int quit_client_handle(int quiting_client){
-	buffered_socket *running = NULL;
+
 	int error =0;
 
-	
+	printf("quiting client %d\n", quiting_client);
 
 	if (get_buffered_socket_by_id(quiting_client)->client_stat == PLAYER)
 	{
@@ -610,7 +605,7 @@ int quit_client_handle(int quiting_client){
 
 		// save pointer of next client in the list (to determine next player turn if needed)
 		buffered_socket* next_player = get_buffered_socket_by_id(quiting_client)->next_client;
-		if(next_player == NULL) next_player = clients_linked_list->first;
+		if(next_player == NULL) next_player = clients_linked_list.first;
 
 		int update_turn = false;
 
@@ -626,10 +621,12 @@ int quit_client_handle(int quiting_client){
 		//try to promote player
 		int new_player_id = get_min_spectator_id(&clients_linked_list);
 
+		
+
 		if(new_player_id == MAX_CLIENTS + 1)
 		{	
 			// no one to promote
-
+			
 			if(current_player_num > 0 && update_turn)
 			{
 				current_turn = get_next_player_id(&clients_linked_list, next_player);
@@ -639,6 +636,8 @@ int quit_client_handle(int quiting_client){
 			}
 			if(current_player_num == 0)
 			{
+				printf("reached here\n");
+				printf("%d %d %d\n", clients_linked_list.size, (int)clients_linked_list.first, (int)clients_linked_list.last);
 				current_turn = 0; /* pause the game */
 			}
 
@@ -703,7 +702,7 @@ int send_heaps_update(int game_over){
 
 	for(running = clients_linked_list.first; running != NULL; running=running->next_client)
 	{
-		error = push(running->output_buffer,(char*)(&heap_mes), sizeof(heap_update_message));
+		error = push(running->output_buffer,(char*)(&heap_msg), sizeof(heap_update_message));
 		if (error == OVERFLOW_ERROR)
 		{
 			printf("Error: could not push update message onto client %d output buffer (buffer full)\n", running->client_id);
@@ -716,7 +715,7 @@ int send_heaps_update(int game_over){
 			if(running->client_id == current_turn)
 			{
 
-				if(isMisere == false)
+				if(IsMisere == false)
 				{
 					// winner is the last player who moved
 					status = WIN;
@@ -730,7 +729,7 @@ int send_heaps_update(int game_over){
 			}
 			else if(running->client_stat == PLAYER)
 			{
-				if(isMisere == false)
+				if(IsMisere == false)
 					status = LOSE;
 				else
 					status = WIN;
@@ -816,8 +815,8 @@ int read_to_buffs(fd_set* read_set){
 
 	buffered_socket *p, * next;
 
-	int error = 0;
 	int cur_socket ;
+	/* temp buffer to store the read data, will be used as a middle man*/
 	char recv_buff[MAX_IO_BUFFER_SIZE];
 	int bytes_recv =0;
 
@@ -829,6 +828,7 @@ int read_to_buffs(fd_set* read_set){
 
 		if (FD_ISSET(cur_socket,read_set)){
 
+			printf("reading from socket\n");
 			/* check if socket is read ready */
 			bytes_recv = recv(cur_socket, recv_buff, MAX_IO_BUFFER_SIZE, 0);
 			if (bytes_recv < 0)
@@ -839,8 +839,10 @@ int read_to_buffs(fd_set* read_set){
 			else if (bytes_recv == 0) 
 			//in this case - connection closed by user 
 			{
+				printf("reading from socket, recv 0 \n");
 				// save next client
 				next = p->next_client;
+				printf("next: %s\n", next == NULL ? "null" : "something");
 				quit_client_handle(p->client_id);
 				p = next;
 				continue;
@@ -871,7 +873,7 @@ void send_info(fd_set* write_set){
 
 	buffered_socket *running_next = NULL;
 	buffered_socket *running      = NULL;
-	int error = 0;
+	
 	int cur_socket;
 	int bytes_read =0;
 
@@ -880,7 +882,7 @@ void send_info(fd_set* write_set){
 	{
 		cur_socket = running->sockfd;
 
-		if (FD_ISSET(cur_socket, write_set)){
+		if (FD_ISSET(cur_socket, write_set) && running->output_buffer->size > 0){
 			int is_connection_closed = 0 ;
 
 			//try to send all the buffer
@@ -985,7 +987,7 @@ int send_final_data(){
 
 		bool finished_sending = true;
 
-		if(clients_linked_list->size == 0)
+		if(clients_linked_list.size == 0)
 		{
 			// client list is empty
 			return 0;
@@ -1017,7 +1019,7 @@ int send_final_data(){
 
 					running_next = running->next_client;
 
-					delete_by_client_id(&clients_linked_list, running);
+					delete_by_client_id(&clients_linked_list, running->client_id);
 
 					running = running_next; //this is because now running points to junk
 					continue;
@@ -1064,14 +1066,14 @@ bool checkServerArgsValidity(int argc,const char* argv[]){
 	errno = 0;
 	//check p parameter
 
-	long p = strtol(argv[2], NULL, 10);
+	long p = strtol(argv[1], NULL, 10);
 	if((p == LONG_MIN || p == LONG_MAX) && errno != 0)
 		// overflow or underflow
 		return false;
 	if( p == 0 )
 		return false;
 	
-	if (p < 1 || p > MAX_CLIENTS) 
+	if (p < 2 || p > MAX_CLIENTS) 
 		return false;
 
 	// check stack size paramater
@@ -1090,13 +1092,13 @@ bool checkServerArgsValidity(int argc,const char* argv[]){
 	// check isMisere paramter
 	if (argv[3][0] != '0' && argv[3][0] != '1') 
 		return false;
-	if (strlen(argv[2]) > 1)
+	if (strlen(argv[3]) > 1)
 		return false;
 	if(argc == 5)
 	{
 		// check port number
 		errno = 0;
-		long port = strtol(argv[3], NULL, 10);
+		long port = strtol(argv[4], NULL, 10);
 		
 		if((port == LONG_MIN || port == LONG_MAX) && errno != 0)
 			return false;

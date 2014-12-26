@@ -1,6 +1,7 @@
 #include "nim_protocol_tools.h"
 #include "socket_IO_tools.h"
 #include <stdio.h>
+#include <netinet/in.h>
 
 /**
 	This method initializes a new openning message to the client
@@ -240,8 +241,15 @@ int valiadate_message(message_container* msg)
 		{
 			heap_update_message* temp = (heap_update_message*)msg;
 			if (temp->game_over != GAME_OVER && temp->game_over != GAME_CONTINUES)
+			{	//printf("game over is: %d\n", temp->game_over);
 				return 1;
+			}
 			int i;
+
+			//for(i = 0; i < NUM_HEAPS; ++i)
+			//{
+			//	printf("heap %d is: %d\n", i, temp->heaps[i]);
+			//}
 			for(i = 0; i < NUM_HEAPS; ++i)
 			{
 				// check if heap values are valid 

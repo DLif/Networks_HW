@@ -31,7 +31,7 @@
 
 int main( int argc, const char* argv[] );
 
-int play_nim(int listeningSoc);
+void play_nim(int listeningSoc);
 
 int get_new_connections(int listeningSoc);
 
@@ -69,3 +69,5 @@ int send_final_data();
 bool checkServerArgsValidity(int argc,const char* argv[]);
 
 int send_your_move();
+
+int handle_ready_messages();

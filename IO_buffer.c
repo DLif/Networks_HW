@@ -102,7 +102,7 @@ int pop_no_return(io_buffer* buff, int num_bytes)
 int send_partially_from_buffer(io_buffer* buff, int sockfd, int num_bytes, int* connection_closed)
 {
 	char* temp_buff = (char*)malloc(num_bytes*sizeof(char));
-
+	
 	if(temp_buff == NULL)
 	{
 		*connection_closed = 0;
@@ -120,7 +120,7 @@ int send_partially_from_buffer(io_buffer* buff, int sockfd, int num_bytes, int* 
 		temp_buff[i] = buff->buffer[(head+i) % MAX_IO_BUFFER_SIZE];
 	}
 
-	int res = send_partially(sockfd, temp_buff, num_bytes, closed_connection);
+	int res = send_partially(sockfd, temp_buff, num_bytes, connection_closed);
 	free(temp_buff);
 
 	return res;
@@ -158,6 +158,8 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 	/* the first byte is is at index head                              */
 	char message_type = buff->buffer[buff->head];
 
+	printf("message type: %d\n", message_type);
+
 	int message_size = get_message_size(message_type);  /* get the size of the actual struct    */
 	if(message_size < 0)
 	{
@@ -170,25 +172,36 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 	{
 		if(message_type == MSG) /* client to client message */
 		{
-			client_to_client_message* msg = (client_to_client_message*)(buff->buffer);
+			pop(buff, (char*)msg_container, message_size);
+			printf("popped %d\n", message_size);
+			printf("trying to read msg, BUFF size %d\n", buff->size);
+			client_to_client_message* msg = (client_to_client_message*)msg_container;
+			printf("but message size is %d\n", msg->length);
+			
 
 			/* we also need to check that the actual message is on the buffer */
-			if(buff->size >= message_size + (unsigned char)(msg->length))
+			if(buff->size >= (unsigned char)(msg->length))
 			{
 				// the actual message is in the buffer
 				// pop the header and store it in msg_container
-				pop(buff, (char*)msg_container, message_size);
+				
+
 				if(valiadate_message(msg_container))
 				{
+					
 					return INVALID_MESSAGE;
 				}
+
+
+				printf("%d %d %d %d\n", msg->message_type, msg->sender_id, msg->destination_id, msg->length);
 
 				return SUCCESS;
 			}
 			else
 			{
 				// the message itself is not on the buffer yet, gotta wait
-				// do not pop anything
+				// do not pop anything, push header back
+				push(buff, (char*)msg_container, message_size);
 				return MSG_NOT_COMPLETE;
 			}
 
@@ -197,6 +210,30 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 		{
 			// pop the message 
 			pop(buff, (char*)msg_container, message_size);
+
+			//  in case of HEAP_UPDATE_MSG or PLAYER_MOVE_MSG
+			if(message_type == HEAP_UPDATE_MSG)
+			{
+				heap_update_message* heap_msg = (heap_update_message*)msg_container;
+				int i = 0;
+
+				for(i = 0; i < NUM_HEAPS; ++i)
+				{
+					heap_msg->heaps[i] = ntohs(heap_msg->heaps[i]);
+
+					printf("heap %d is %d\n", i, heap_msg->heaps[i]);
+				}
+
+			}
+			
+			else if(message_type == PLAYER_MOVE_MSG)
+			{
+				player_move_msg* player_move = (player_move_msg*)msg_container;
+				player_move->amount_to_remove = ntohs(player_move->amount_to_remove);
+				
+			}
+
+			printf("message size: %d\n", message_size);
 
 			if(message_size == 1)
 			{
@@ -207,29 +244,12 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 
 			if(valiadate_message(msg_container))
 			{
+				printf("BEFORE INVALID %d\n", message_size);
 				return INVALID_MESSAGE;
 			}
+			printf("AFTER INVALID %d\n", message_size);
 
-
-			// final stage, in case of HEAP_UPDATE_MSG or PLAYER_MOVE_MSG
-			if(message_type == HEAP_UPDATE_MSG)
-			{
-				heap_update_message* heap_msg = (heap_update_message*)msg_container;
-				int i = 0;
-
-				for(i = 0; i < NUM_HEAPS; ++i)
-				{
-					heap_msg->heaps[i] = ntohs(heap_msg->heaps[i]);
-				}
-
-			}
 			
-			else if(message_type == PLAYER_MOVE_MSG)
-			{
-				player_move_msg* player_move_msg = (player_move_msg*)msg_container;
-				player_move_msg->amount_to_remove = ntohs(player_move_msg->amount_to_remove);
-				
-			}
 			return SUCCESS;
 		}
 
@@ -240,4 +260,13 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 
 	return MSG_NOT_COMPLETE;
 
+}
+
+
+void clear_io_buffer(io_buffer* buf)
+{
+	buf->size = 0;
+	buf->head = 0;
+	buf->tail = 0;                         
+	
 }

@@ -125,7 +125,7 @@ int get_minimum_free_client_id(client_list* list)
 	while( p != NULL)
 	{
 		seen[p->client_id - 1] = 1;
-		p = next;
+		p = p->next_client;
 	}
 
 	int i ;
