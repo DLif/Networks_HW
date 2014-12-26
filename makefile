@@ -29,7 +29,7 @@ advanced_server.o: advanced_server.c advanced_server.h buffered_socket.h nim_pro
 nim_game.o: nim_game.c nim_game.h
 	gcc -c $*.c $(FLAGS)
 
-IO_buffer.o: IO_buffer.c IO_buffer.h nim_protocol_tools.h
+IO_buffer.o: IO_buffer.c IO_buffer.h nim_protocol_tools.h socket_IO_tools.h
 	gcc -c $*.c $(FLAGS)
 
 buffered_socket.o: buffered_socket.c buffered_socket.h IO_buffer.h
