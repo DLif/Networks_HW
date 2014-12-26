@@ -92,6 +92,41 @@ int pop_no_return(io_buffer* buff, int num_bytes)
 
 }
 
+/*
+	same as send_partially as defined in socket_IO_tools
+	but handles sending from a circular buffers
+
+	returns a negative value on error (malloc error may also occur)
+*/
+
+int send_partially_from_buffer(io_buffer* buff, int sockfd, int num_bytes, int* connection_closed)
+{
+	char* temp_buff = (char*)malloc(num_bytes*sizeof(char));
+
+	if(temp_buff == NULL)
+	{
+		*connection_closed = 0;
+		return -1;
+
+	}
+
+	// fill temp_buffer
+
+	int head = buff->head;
+
+	int i;
+	for(i = 0; i < num_bytes; ++i)
+	{
+		temp_buff[i] = buff->buffer[(head+i) % MAX_IO_BUFFER_SIZE];
+	}
+
+	int res = send_partially(sockfd, temp_buff, num_bytes, closed_connection);
+	free(temp_buff);
+
+	return res;
+
+
+}
 
 
 /*
@@ -113,7 +148,7 @@ int pop_no_return(io_buffer* buff, int num_bytes)
 
 int pop_message(io_buffer* buff, message_container* msg_container)
 {
-	//if buffer empty, can;t pop message(no message exsist).
+	//if buffer empty, can't pop message(no message exists).
 	if (buff->size == 0)
 	{
 		//no messages in buffer
@@ -122,7 +157,6 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 	/* read the first byte first, that defines the type of the message */
 	/* the first byte is is at index head                              */
 	char message_type = buff->buffer[buff->head];
-	msg_container->message_type = message_type;
 
 	int message_size = get_message_size(message_type);  /* get the size of the actual struct    */
 	if(message_size < 0)
@@ -130,12 +164,6 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 		/* invalid message */
 		return INVALID_MESSAGE;
 	}
-
-	/*if(message_size == 1)
-	{
-		// we only needed to read a single byte, that defines the message -WHY???????? WTF
-		return SUCCESS;
-	}*/
 
 	/* check if we can pop the header */
 	if(buff->size >= message_size)
@@ -145,7 +173,7 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 			client_to_client_message* msg = (client_to_client_message*)(buff->buffer);
 
 			/* we also need to check that the actual message is on the buffer */
-			if(buff->size >= message_size + msg->length)
+			if(buff->size >= message_size + (unsigned char)(msg->length))
 			{
 				// the actual message is in the buffer
 				// pop the header and store it in msg_container
@@ -169,9 +197,38 @@ int pop_message(io_buffer* buff, message_container* msg_container)
 		{
 			// pop the message 
 			pop(buff, (char*)msg_container, message_size);
+
+			if(message_size == 1)
+			{
+				// message was already validated by get_message_size
+				// we popped what we wanted
+				return SUCCESS;
+			}
+
 			if(valiadate_message(msg_container))
 			{
 				return INVALID_MESSAGE;
+			}
+
+
+			// final stage, in case of HEAP_UPDATE_MSG or PLAYER_MOVE_MSG
+			if(message_type == HEAP_UPDATE_MSG)
+			{
+				heap_update_message* heap_msg = (heap_update_message*)msg_container;
+				int i = 0;
+
+				for(i = 0; i < NUM_HEAPS; ++i)
+				{
+					heap_msg->heaps[i] = ntohs(heap_msg->heaps[i]);
+				}
+
+			}
+			
+			else if(message_type == PLAYER_MOVE_MSG)
+			{
+				player_move_msg* player_move_msg = (player_move_msg*)msg_container;
+				player_move_msg->amount_to_remove = ntohs(player_move_msg->amount_to_remove);
+				
 			}
 			return SUCCESS;
 		}

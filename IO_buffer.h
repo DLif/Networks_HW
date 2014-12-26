@@ -1,6 +1,7 @@
 #ifndef IO_BUFFER_H
 #define IO_BUFFER_H
 #include "nim_protocol_tools.h"
+#include "socket_IO_tools.h"
 
 #define MAX_IO_BUFFER_SIZE 2000   /* maximum size of input/output buffer */
 #define OVERFLOW_ERROR     1
@@ -62,4 +63,15 @@ int pop_no_return(io_buffer* buff, int num_bytes);
 
 
 int pop_message(io_buffer* buff, message_container* msg_container);
+
+
+
+/*
+	same as send_partially as defined in socket_IO_tools
+	but handles sending from a circular buffers
+
+	returns a negative value on error (malloc error may also occur)
+*/
+int send_partially_from_buffer(io_buffer* buff, int sockfd, int num_bytes, int* connection_closed);
+
 #endif 

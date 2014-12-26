@@ -235,7 +235,7 @@ void play_nim()
 			{
 				printf("test point\n");
 			}
-			num_bytes = send_partially(sockfd, (char*)(buff_socket->output_buffer->buffer), buff_socket->output_buffer->size, &connection_closed);
+			num_bytes = send_partially_from_buffer(buff_socket->output_buffer,sockfd, buff_socket->output_buffer->size, &connection_closed);
 			if(num_bytes < 0)
 			{
 				handle_send_error(connection_closed);

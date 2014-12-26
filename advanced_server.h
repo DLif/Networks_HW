@@ -20,8 +20,8 @@
 #include "socket_IO_tools.h"
 #include "client_list.h"
 
-#define NETWORK_FUNC_FAILURE -1 /* error code */
-#define END_GAME 1
+#define ERROR -1 /* error code */
+#define END_GAME 5
 #define MAX_CLIENTS   9
 
 
@@ -31,33 +31,32 @@
 
 int main( int argc, const char* argv[] );
 
-int server_loop(int listeningSoc);
+int play_nim(int listeningSoc);
 
 int get_new_connections(int listeningSoc);
 
-int handle_reading_writing(fd_set* read_set,fd_set* write_set,int *curr_to_play,bool *first_move);
+
 
 int initServer(short port);
 
-void init_clients_array();
 
-int calc_next_player(int prev_player);
+void update_turn(void);
 
 buffered_socket* get_buffered_socket_by_id(int req_id);
 
-int chat_message_handle(int sender,message_container *abs_message);
+int chat_message_handle(int sender, client_to_client_message *abs_message);
 
-int game_message_handle(int curr_to_play,int curr_user,message_container** message_container_p,player_move_msg** game_move_p);
+int game_message_handle(int curr_player , player_move_msg* message);
 
 int quit_client_handle(int quiting_client);
 
-int send_heap_mss_to_all();
+int send_heaps_update(int game_over);
 
-int  send_move_leagelness(int curr_to_play,bool is_leagel_move);
+int send_move_ACK(int current_client, bool is_legal_move);
 
 int read_to_buffs(fd_set* read_set);
 
-int send_info(fd_set* write_set);
+void send_info(fd_set* write_set);
 
 void setReadSet(fd_set* read_set,int listeningSoc);
 
@@ -65,12 +64,8 @@ void setWriteSet(fd_set* write_set);
 
 int findMax(int listeningSoc);
 
-int send_msg_affter_endGame();
-
-void calc_min_by_new_free(int new_free);
-
-void calc_new_min_by_occupy();
+int send_final_data();
 
 bool checkServerArgsValidity(int argc,const char* argv[]);
 
-int send_your_move(int next_player);
+int send_your_move();

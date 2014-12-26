@@ -47,7 +47,7 @@ void create_heap_update_message(heap_update_message* message, short* heaps, char
 	int i;
 	for(i = 0; i < NUM_HEAPS; ++i )
 	{
-		message->heaps[i] = heaps[i];
+		message->heaps[i] = htons(heaps[i]);
 	}
 	message->game_over = game_over;
 }
@@ -125,7 +125,7 @@ void create_player_move_message(player_move_msg* message, char heap_index, short
 {
 	message->message_type = PLAYER_MOVE_MSG;
 	message->heap_index = heap_index;
-	message->amount_to_remove = amount_to_remove;
+	message->amount_to_remove = htons(amount_to_remove);
 
 }
 
