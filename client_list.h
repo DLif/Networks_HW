@@ -76,4 +76,9 @@ int get_next_player_id(client_list* list, buffered_socket* current);
 
 int get_min_spectator_id(client_list* list);
 
+/*
+	this method returns a pointer to the buffered_socket of client number req_id
+*/
+buffered_socket* get_buffered_socket_by_id(int req_id,client_list* client_lst);
+
 #endif

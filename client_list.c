@@ -249,3 +249,23 @@ void delete_by_client_id(client_list* list, int client_id)
 	}
 
 }
+
+/*
+
+	method finds a buffered socket from the list by given req_id (should be non negative)
+	if no such client is found, NULL is returned 
+*/
+
+buffered_socket* get_buffered_socket_by_id(int req_id,client_list* client_lst){
+
+	buffered_socket *running = NULL;
+	for(running = client_lst->first; running != NULL; running = running->next_client){
+		if (running->client_id == req_id)
+		{
+			return running;
+		}
+	}
+
+
+	return NULL;
+}
