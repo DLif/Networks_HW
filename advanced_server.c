@@ -1,11 +1,5 @@
 #include "advanced_server.h"
 
-/* max PLAYERS number as received from the input args (p value as defined in the pdf) */
-
-int max_players_allowed = 3;
-
- 
-
 
 int main( int argc, const char* argv[] ){
 	short port = 6325;	 //set the port to default
@@ -20,7 +14,7 @@ int main( int argc, const char* argv[] ){
 	}
 
 	// read the input from command line
-	max_players_allowed= atoi(argv[1]);
+	max_players_allowed = atoi(argv[1]);
 	M = (short)atoi(argv[2]);
 	if (atoi(argv[3]) == 0)	
 		input_isMisere = false;
@@ -204,6 +198,10 @@ int get_new_connections(int listeningSoc){
 			return 1;
 		}
 
+
+		/* add the spectator to the list (append to the end) */
+		add_client(&clients_linked_list, new_client);
+
 	}
 	else{
 		
@@ -219,11 +217,13 @@ int get_new_connections(int listeningSoc){
 		}
 		
 		++current_player_num;
+
+		/* add the player as the last player */
+		add_player(&clients_linked_list, new_client, current_turn);
 		
 		
 	}
-	/* add the client to the list */
-	add_client(&clients_linked_list, new_client);
+	
 
 	// create openning message (accepting message with the relevant info )
 	create_openning_message(&first_msg, IsMisere, max_players_allowed, new_client_id, new_client->client_stat);
@@ -295,96 +295,6 @@ int initServer(short port){
 	return listeningSocket;
 }
 
-
-/*
-
-	after the game has ended, this method
-	tries to send the information (using select) untill all players either closed connection or all data was sent
-
-	returns ERROR on error, 0 otherwise 
-*/
-
-
-int send_final_data(){
-
-
-	fd_set read_set;
-	fd_set write_set;
-
-	int fd_max;
-	int error =0;
-
-	buffered_socket *running = NULL;
-	buffered_socket *running_next = NULL;
-
-	while(1){
-
-		bool finished_sending = true;
-
-		if(clients_linked_list.size == 0)
-		{
-			// client list is empty
-			return 0;
-		}
-
-		setReadSet(&read_set, -1); // -1 stands for: do not add listening socket
-		setWriteSet(&write_set);
-		fd_max = findMax(-1);     //we dont try to read listening socket now
-
-		error = select(fd_max+1,&read_set,&write_set,NULL,NULL);
-		if (error <0 )
-		{
-			printf("Error: select failed %s\n", strerror(errno));
-			return ERROR;
-		}
-
-
-		//check if all buffers are empty and check who quit
-
-		for(running = clients_linked_list.first ; running != NULL; )
-		{	
-			if (FD_ISSET(running->sockfd,&read_set))
-			{
-				char temp;
-				if(recv(running->sockfd, &temp, 1, 0) <= 0)
-				{
-					// connection closed
-
-					running_next = running->next_client;
-
-					delete_by_client_id(&clients_linked_list, running->client_id);
-
-					running = running_next; //this is because now running points to junk
-					continue;
-				}
-				
-			}
-			if (running->output_buffer->size > 0)
-			{
-				
-				finished_sending = false;
-			}
-		
-			
-			running = running->next_client; 
-			
-		}
-
-
-		if (!finished_sending)
-		{
-			
-			// send to all the write ready
-			send_info(&write_set);
-	
-		}
-		else{
-			
-			// finished sending all sockets, may exit
-			return 0;
-		}
-	}
-}
 
 
 

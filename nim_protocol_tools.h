@@ -30,17 +30,11 @@
 /* define message types */
 
 #define HEAP_UPDATE_MSG     1
-
-
 #define CLIENT_TURN_MSG     2
-
 #define ACK_MOVE_MSG        3
 #define ILLEGAL_MOVE_MSG    4
-
 #define MSG                 5 
-
 #define PROMOTION_MSG       6
-
 #define PLAYER_MOVE_MSG     7
 
 
@@ -56,7 +50,7 @@ typedef struct openning_message
 	char connection_accepted;         /* CONNECTION_ACCEPTED or CONNECTION_DENIED */
 	char isMisere;                    /* MISERE or REGULAR */
 	char p;                           /* number of players <= 9 */
-	char client_id;                   /* client id <= 24 */
+	char client_id;                   /* client id <= 9 (bonus) */
 	char client_type;                 /* PLAYER or SPECTATOR */
 
 } openning_message;
@@ -175,7 +169,7 @@ typedef struct player_move_msg
 typedef struct message_container
 {
 	char message_type;              /* message type as defined above */
-	char filler[10];                /* message container */
+	char filler[MAX_FILLER_SIZE];   /* message container */
 
 } message_container;
 #pragma pack(pop)

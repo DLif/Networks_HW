@@ -20,7 +20,7 @@ typedef struct client_list
 
 void init_client_list(client_list* list);
 
-/* add a client to the given list */
+/* add a client to the given list,*/
 
 void add_client(client_list* list, buffered_socket* node);
 
@@ -35,6 +35,14 @@ void add_client(client_list* list, buffered_socket* node);
 void delete_by_client_id(client_list* list, int client_id);
 
 
+/* 
+   add a player to the given list, the addition is done circurality, 
+   meaning that the player will be added after all the other existing player have made their move
+   the head of the list is given as a parameter, current_player
+
+   [ in order words, the given node will be added right before the current player in the list]
+*/
+void add_player(client_list* list, buffered_socket* node, int current_player_id);
 
 
 
@@ -69,16 +77,31 @@ int get_next_player_id(client_list* list, buffered_socket* current);
 
 
 
-/*
-	this method finds the minimum spectator id in the given list
-	returns max_client_num + 1 if no spectators found
-*/
-
-int get_min_spectator_id(client_list* list);
 
 /*
 	this method returns a pointer to the buffered_socket of client number req_id
 */
 buffered_socket* get_buffered_socket_by_id(int req_id,client_list* client_lst);
+
+
+
+
+
+/*
+	this method promotes a spectator to a player
+	modifies the given list as required
+	if no spectator is found, returns NULL
+	otherwise, returns the spectator that was promoted
+
+	params
+		list - the given client list
+		current_player_id - id of player that it is currently his turn
+
+*/
+
+
+buffered_socket* promote_spectator(client_list* list, int current_player_id);
+
+
 
 #endif

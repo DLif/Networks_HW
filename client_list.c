@@ -12,7 +12,9 @@ void init_client_list(client_list* list)
 	list->last = NULL;
 }
 
-/* add a client to the given list (at the end)*/
+/* add a client to the given list
+   use this to simply append a spectator
+*/
 
 void add_client(client_list* list, buffered_socket* node)
 {
@@ -37,30 +39,152 @@ void add_client(client_list* list, buffered_socket* node)
 
 
 /*
-	this method finds the minimum spectator id in the given list
-	returns MAX_CLIENTS + 1 if no spectators found
+	this method promotes a spectator to a player
+	modifies the given list as required
+	if no spectator is found, returns NULL
+	otherwise, returns the spectator that was promoted
+
+	params
+		list - the given client list
+		current_player_id - id of player that it is currently his turn
+							(put 0 if list is empty )
+
 */
 
-int get_min_spectator_id(client_list* list)
+
+buffered_socket* promote_spectator(client_list* list, int current_player_id)
 {
 
-	int min; 
-	
-	buffered_socket* p    = list->first;
+	/* find the spectator, remove it and re-insert it as a player
+	   in the correct place
+    */
 
-	min = MAX_CLIENTS + 1;
+	buffered_socket* p = list->first;
+	buffered_socket* spectator = NULL;
 
-	while( p != NULL)
+	if( p == NULL)
+		return NULL;
+
+	while(p->next_client != NULL)
 	{
-		if(p->client_stat == SPECTATOR)
-		{	
-			min = p->client_id < min ? p->client_id : min;
+
+		if(p->next_client->client_stat == SPECTATOR)
+		{
+			// found the first spectator
+			spectator = p->next_client;
+
+			// now remove it from the list
+			// we know for sure that a specator cannot be the head of the list
+			// the head of the list, if exists is surely a player
+			// he may be however the last item in the list
+			if(spectator == list->last)
+			{	
+				list->last = p;
+				p->next_client = NULL;
+			}
+			else
+			{
+				p->next_client = spectator->next_client;
+
+			}
+
+			list->size -= 1;
+			break;
 		}
+
+		// advance
 		p = p->next_client;
 	}
 
-	return min;
+	if( spectator == NULL)
+	{
+		// no spectator found
+		return NULL;
+	}
 
+	spectator->client_stat = PLAYER;
+
+	// else, we found a spectator that we want to promote
+	// add it as a player to the correct place
+	add_player(list, spectator, current_player_id);
+
+	return spectator;
+	
+}
+
+
+/* 
+   add a player to the given list, the addition is done circurality, 
+   meaning that the player will be added after all the other existing player have made their move
+   the head of the list is given as a parameter, current_player
+
+   [ in order words, the given node will be added right before the current player in the list]
+*/
+void add_player(client_list* list, buffered_socket* node, int current_player_id)
+{
+	// basicly add the given node right before the current player
+
+	buffered_socket* p = list->first;
+
+	if(p == NULL)
+	{
+		/* empty list case */
+		/* simply append to the end*/
+		add_client(list, node);
+		return;
+	}
+
+
+	if( p->client_id == current_player_id)
+	{
+		/* first player in the list */
+		/* append to the head of the list */
+		node->next_client = p;
+		list->first = node;
+		list->size += 1;
+		return;
+		
+	}
+
+	while(p->next_client->client_id != current_player_id)
+	{
+		// advance
+		p = p->next_client;
+	}
+
+	// we found the node before the the current player
+	// insert just between them
+	node->next_client = p->next_client;
+	p->next_client = node;
+	list->size += 1;
+
+	return;
+
+}
+
+
+
+/*
+	this method find the first spectator in the list, if such exists
+	the idea is to promote the first spectator in the list, in other words, the spectator that
+	had waited the most
+
+	if all clients are players, a negative value is returned
+*/
+
+
+int get_first_spectator_id(client_list* list)
+{
+	buffered_socket* p = list->first;
+
+	while(p != NULL)
+	{
+		if(p->client_stat == SPECTATOR)
+			return p->client_id;
+
+		p = p->next_client;
+	}
+	return -1;
 
 }
 
