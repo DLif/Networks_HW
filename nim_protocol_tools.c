@@ -283,11 +283,14 @@ int valiadate_message(message_container* msg)
 			player_move_msg* temp = (player_move_msg*)msg;
 			/* check number of heaps */
 			if((unsigned char)(temp->heap_index) >= NUM_HEAPS)
+			{
+				
 				return 1;
-
+			}
 			/* check amount to remove */
 			if((unsigned short)(temp->amount_to_remove) > MAX_HEAP_SIZE)
 			{
+				
 				return 1;
 			}
 

@@ -49,8 +49,6 @@ static unsigned char client_id;
 
 
 
-int debug = 0;
-
 int main(int argc, char* argv[])
 {
 
@@ -295,7 +293,6 @@ void handle_user_input()
 		quit();
 	}
 
-	printf("reached here\n");
 
 	/* close string */
 	buffer[2] = 0;
@@ -316,8 +313,8 @@ void handle_user_input()
 		quit();
 	}
 
-	// determine if the number can be cast to unsigned char properly
-	if(temp == LONG_MIN || temp == LONG_MAX || temp == 0 || temp > UCHAR_MAX || temp < -1)
+	// determine if the number can be cast to unsigned char properly, DON'T ALLOW IT TO BE 255 
+	if(temp == LONG_MIN || temp == LONG_MAX || temp == 0 || temp > UCHAR_MAX-1 || temp < -1)
 	{
 		/* note that we allow temp == -1 */
 		printf(USER_INPUT_ERR);
@@ -396,7 +393,6 @@ void handle_user_input()
 		quit();
 	}
 
-	debug = 1;
 	
 }
 
@@ -573,6 +569,12 @@ void handle_user_move(char heap)
 		quit();
 	}
 	items_to_remove = (unsigned short)temp;
+
+	if(items_to_remove > 1500)
+	{
+		printf("Error: amount to remove argument should be <= 1500\n");
+		quit();
+	}
 		
 
 	if(!client_turn)

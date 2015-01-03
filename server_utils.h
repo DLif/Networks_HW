@@ -1,6 +1,11 @@
 #ifndef _SERVER_UTILS
 #define _SERVER_UTILS
 
+/*
+	this module provides event handlers for the server and various helper methods to send and recieve data
+*/
+
+
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
